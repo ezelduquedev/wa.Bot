@@ -1,184 +1,124 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
-import axios from 'axios';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
+const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
 
-export default function Dashboard() {
+export default function Home() {
   const [stats, setStats] = useState({ total: 0, open: 0, closed: 0 });
-  const [lastUpdate, setLastUpdate] = useState('');
+  const [systemOk, setSystemOk] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchStats();
-    const interval = setInterval(fetchStats, 10000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const fetchStats = async () => {
+  const fetchData = async () => {
     try {
-      const res = await axios.get(`${BACKEND_URL}/api/conversations`);
-      const convs = res.data || [];
-      const open = convs.filter(c => c.status === 'OPEN').length;
-      const closed = convs.filter(c => c.status === 'CLOSED').length;
-      setStats({ total: convs.length, open, closed });
-      setLastUpdate(new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }));
-    } catch (e) {
-      console.error('Error fetching stats:', e);
+      // Health check
+      const health = await fetch(`${BACKEND}/health`);
+      setSystemOk(health.ok);
+
+      // Conversations
+      const res = await fetch(`${BACKEND}/api/conversations`);
+      if (res.ok) {
+        const data = await res.json();
+        const convs = Array.isArray(data) ? data : data.conversations || [];
+        setStats({
+          total: convs.length,
+          open: convs.filter(c => c.status === 'open').length,
+          closed: convs.filter(c => c.status === 'closed').length,
+        });
+      }
+    } catch {
+      setSystemOk(false);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const systemStatus = [
-    { name: 'WhatsApp Cloud API', status: 'Activo', ok: true },
-    { name: 'Gemini IA', status: 'Activo', ok: true },
-    { name: 'PostgreSQL', status: 'Activo', ok: true },
-    { name: 'Deploy Railway', status: 'Activo', ok: true },
-    { name: 'Deploy Vercel', status: 'Activo', ok: true },
-  ];
+  useEffect(() => {
+    fetchData();
+    const interval = setInterval(fetchData, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const StatCard = ({ label, value, color, bg }) => (
+    <div style={{
+      background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px',
+      padding: '24px', flex: 1,
+    }}>
+      <div style={{ fontSize: '13px', color: '#6b7280', fontWeight: '500', marginBottom: '8px' }}>{label}</div>
+      <div style={{ fontSize: '36px', fontWeight: '800', color: color || '#111827' }}>{loading ? '—' : value}</div>
+    </div>
+  );
 
   return (
     <Layout>
-      <div className="page">
-        <div className="page-header">
-          <div>
-            <h1 className="page-title">Dashboard</h1>
-            {lastUpdate && <p className="page-sub">Última actualización: {lastUpdate}</p>}
-          </div>
-          <div className="avatar-btn">N</div>
-        </div>
-
-        <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-icon">💬</div>
-            <div className="stat-value">{stats.total}</div>
-            <div className="stat-label">TOTAL CONVERSACIONES</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon">🟢</div>
-            <div className="stat-value">{stats.open}</div>
-            <div className="stat-label">ABIERTAS</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon">⬜</div>
-            <div className="stat-value">{stats.closed}</div>
-            <div className="stat-label">CERRADAS</div>
-          </div>
-        </div>
-
-        <div className="section">
-          <h2 className="section-title">Estado del sistema</h2>
-          <div className="status-list">
-            {systemStatus.map((item) => (
-              <div key={item.name} className="status-row">
-                <div className="status-left">
-                  <span className={`dot ${item.ok ? 'dot-green' : 'dot-orange'}`}></span>
-                  <span className="status-name">{item.name}</span>
-                </div>
-                <span className={`status-val ${item.ok ? 'val-green' : 'val-orange'}`}>
-                  {item.status}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* Header */}
+      <div style={{
+        background: '#25D366', color: '#fff',
+        padding: '16px 28px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <div style={{ fontWeight: '700', fontSize: '18px' }}>Dashboard</div>
+        <div style={{ fontSize: '13px', opacity: 0.85 }}>Auto-refresh: 10s</div>
       </div>
 
-      <style jsx>{`
-        .page {
-          padding: 32px;
-          max-width: 900px;
-        }
-        .page-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          margin-bottom: 28px;
-        }
-        .page-title {
-          font-size: 26px;
-          font-weight: 700;
-          color: #111827;
-          margin: 0;
-        }
-        .page-sub {
-          font-size: 13px;
-          color: #9ca3af;
-          margin: 4px 0 0;
-        }
-        .avatar-btn {
-          width: 36px;
-          height: 36px;
-          border-radius: 50%;
-          background: #111827;
-          color: white;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: 700;
-          font-size: 14px;
-        }
-        .stats-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 16px;
-          margin-bottom: 28px;
-        }
-        .stat-card {
-          background: white;
-          border-radius: 12px;
-          padding: 20px 24px;
-          border: 1px solid #e5e7eb;
-          display: flex;
-          align-items: center;
-          gap: 16px;
-        }
-        .stat-icon { font-size: 22px; }
-        .stat-value {
-          font-size: 28px;
-          font-weight: 800;
-          color: #111827;
-          line-height: 1;
-        }
-        .stat-label {
-          font-size: 10px;
-          color: #9ca3af;
-          font-weight: 600;
-          letter-spacing: 0.5px;
-          margin-top: 2px;
-        }
-        .section {
-          background: white;
-          border-radius: 12px;
-          border: 1px solid #e5e7eb;
-          padding: 24px;
-        }
-        .section-title {
-          font-size: 16px;
-          font-weight: 600;
-          color: #111827;
-          margin: 0 0 16px;
-        }
-        .status-list { display: flex; flex-direction: column; gap: 0; }
-        .status-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 12px 0;
-          border-bottom: 1px solid #f3f4f6;
-        }
-        .status-row:last-child { border-bottom: none; }
-        .status-left { display: flex; align-items: center; gap: 10px; }
-        .dot {
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-        }
-        .dot-green { background: #22c55e; }
-        .dot-orange { background: #f59e0b; }
-        .status-name { font-size: 14px; color: #374151; }
-        .status-val { font-size: 13px; font-weight: 600; }
-        .val-green { color: #16a34a; }
-        .val-orange { color: #d97706; }
-      `}</style>
+      <div style={{ padding: '28px' }}>
+        {/* System status */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '10px',
+          background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px',
+          padding: '16px 20px', marginBottom: '24px',
+        }}>
+          <div style={{
+            width: '10px', height: '10px', borderRadius: '50%',
+            background: systemOk === null ? '#9ca3af' : systemOk ? '#25D366' : '#ef4444',
+          }} />
+          <span style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>
+            Sistema: {systemOk === null ? 'Verificando...' : systemOk ? 'Online ✓' : 'Sin conexión'}
+          </span>
+          <span style={{ fontSize: '13px', color: '#9ca3af', marginLeft: '4px' }}>
+            {BACKEND}
+          </span>
+        </div>
+
+        {/* Stats */}
+        <div style={{ display: 'flex', gap: '16px', marginBottom: '28px' }}>
+          <StatCard label="Total conversaciones" value={stats.total} />
+          <StatCard label="Conversaciones abiertas" value={stats.open} color="#16a34a" />
+          <StatCard label="Conversaciones cerradas" value={stats.closed} color="#6b7280" />
+        </div>
+
+        {/* Info */}
+        <div style={{
+          background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '24px',
+        }}>
+          <div style={{ fontWeight: '700', fontSize: '16px', color: '#111827', marginBottom: '16px' }}>
+            Estado del sistema
+          </div>
+          {[
+            ['Backend (Railway)', 'https://wabot-production-f502.up.railway.app', systemOk],
+            ['Dashboard (Vercel)', 'https://wa-bot-iota.vercel.app', true],
+            ['Webhook Meta', '/webhook → verificado', true],
+            ['Gemini API', 'Integrado en backend', true],
+          ].map(([name, url, ok]) => (
+            <div key={name} style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '12px 0', borderBottom: '1px solid #f3f4f6',
+            }}>
+              <div>
+                <div style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>{name}</div>
+                <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>{url}</div>
+              </div>
+              <span style={{
+                fontSize: '12px', fontWeight: '600',
+                color: ok ? '#16a34a' : '#ef4444',
+                background: ok ? '#dcfce7' : '#fee2e2',
+                padding: '4px 12px', borderRadius: '999px',
+              }}>
+                {ok ? '✓ Activo' : '✗ Error'}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
     </Layout>
   );
 }

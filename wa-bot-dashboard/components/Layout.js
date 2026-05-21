@@ -5,130 +5,88 @@ export default function Layout({ children }) {
   const router = useRouter();
 
   const navItems = [
-    { href: '/', label: 'Dashboard', icon: '⊞' },
-    { href: '/conversations', label: 'Conversaciones', icon: '💬' },
-    { href: '/campaigns', label: 'Campañas', icon: '📢' },
-    { href: '/contacts', label: 'Contactos', icon: '👤' },
-    { href: '/settings', label: 'Ajustes', icon: '⚙️' },
+    { href: '/', label: 'Dashboard', icon: '⊞', emoji: true },
+    { href: '/conversations', label: 'Conversaciones', icon: '📢', emoji: true },
+    { href: '/campaigns', label: 'Campañas', icon: '👤', emoji: true },
+    { href: '/contacts', label: 'Contactos', icon: '👤', emoji: true },
+    { href: '/settings', label: 'Ajustes', icon: '⚙️', emoji: true },
   ];
 
+  const isActive = (href) => {
+    if (href === '/') return router.pathname === '/';
+    return router.pathname.startsWith(href);
+  };
+
   return (
-    <div className="layout">
-      <aside className="sidebar">
-        <div className="sidebar-logo">
-          <span className="logo-text">WA.Bot</span>
-          <span className="logo-sub">ENTERPRISE MESSAGING</span>
+    <div style={{ display: 'flex', minHeight: '100vh', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+      {/* Sidebar */}
+      <aside style={{
+        width: '200px',
+        minWidth: '200px',
+        background: '#fff',
+        borderRight: '1px solid #e5e7eb',
+        display: 'flex',
+        flexDirection: 'column',
+        padding: '0',
+      }}>
+        {/* Logo */}
+        <div style={{
+          padding: '20px 20px 16px 20px',
+          borderBottom: '1px solid #e5e7eb',
+        }}>
+          <div style={{ fontWeight: '800', fontSize: '22px', color: '#25D366', letterSpacing: '-0.5px' }}>
+            WA.Bot
+          </div>
+          <div style={{ fontSize: '10px', color: '#9ca3af', fontWeight: '600', letterSpacing: '1.5px', marginTop: '2px' }}>
+            ENTERPRISE MESSAGING
+          </div>
         </div>
 
-        <nav className="sidebar-nav">
+        {/* Nav */}
+        <nav style={{ flex: 1, padding: '12px 0' }}>
           {navItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`nav-item ${router.pathname === item.href ? 'active' : ''}`}
-            >
-              <span className="nav-icon">{item.icon}</span>
-              <span className="nav-label">{item.label}</span>
+            <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '10px 20px',
+                fontSize: '14px',
+                fontWeight: isActive(item.href) ? '600' : '400',
+                color: isActive(item.href) ? '#111827' : '#6b7280',
+                background: isActive(item.href) ? '#f3f4f6' : 'transparent',
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+                borderLeft: isActive(item.href) ? '3px solid #25D366' : '3px solid transparent',
+              }}>
+                <span style={{ fontSize: '15px' }}>{item.icon}</span>
+                <span>{item.label}</span>
+              </div>
             </Link>
           ))}
         </nav>
 
-        <div className="sidebar-footer">
-          <a href="#" className="nav-item">
-            <span className="nav-icon">❓</span>
-            <span className="nav-label">Ayuda</span>
-          </a>
-          <a href="#" className="nav-item">
-            <span className="nav-icon">→</span>
-            <span className="nav-label">Cerrar sesión</span>
-          </a>
+        {/* Bottom links */}
+        <div style={{ padding: '12px 0', borderTop: '1px solid #e5e7eb' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '10px',
+            padding: '10px 20px', fontSize: '14px', color: '#6b7280', cursor: 'pointer'
+          }}>
+            <span>❓</span><span>Ayuda</span>
+          </div>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '10px',
+            padding: '10px 20px', fontSize: '14px', color: '#6b7280', cursor: 'pointer'
+          }}>
+            <span>→</span><span>Cerrar sesión</span>
+          </div>
         </div>
       </aside>
 
-      <main className="main-content">
+      {/* Main content */}
+      <main style={{ flex: 1, background: '#f9fafb', overflow: 'auto' }}>
         {children}
       </main>
-
-      <style jsx>{`
-        .layout {
-          display: flex;
-          min-height: 100vh;
-          background: #f5f7fa;
-        }
-        .sidebar {
-          width: 220px;
-          min-height: 100vh;
-          background: #fff;
-          border-right: 1px solid #e8ecf0;
-          display: flex;
-          flex-direction: column;
-          padding: 0;
-          position: fixed;
-          top: 0;
-          left: 0;
-          bottom: 0;
-          z-index: 100;
-        }
-        .sidebar-logo {
-          padding: 24px 20px 20px;
-          border-bottom: 1px solid #f0f2f5;
-        }
-        .logo-text {
-          display: block;
-          font-size: 22px;
-          font-weight: 800;
-          color: #25D366;
-          letter-spacing: -0.5px;
-        }
-        .logo-sub {
-          display: block;
-          font-size: 9px;
-          color: #9ca3af;
-          letter-spacing: 1.5px;
-          margin-top: 2px;
-        }
-        .sidebar-nav {
-          flex: 1;
-          padding: 12px 10px;
-        }
-        .nav-item {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 9px 12px;
-          border-radius: 8px;
-          color: #6b7280;
-          text-decoration: none;
-          font-size: 14px;
-          font-weight: 500;
-          margin-bottom: 2px;
-          transition: all 0.15s;
-          cursor: pointer;
-        }
-        .nav-item:hover {
-          background: #f3f4f6;
-          color: #111827;
-        }
-        .nav-item.active {
-          background: #f0fdf4;
-          color: #16a34a;
-          font-weight: 600;
-        }
-        .nav-icon {
-          font-size: 16px;
-          width: 20px;
-          text-align: center;
-        }
-        .sidebar-footer {
-          padding: 12px 10px;
-          border-top: 1px solid #f0f2f5;
-        }
-        .main-content {
-          margin-left: 220px;
-          flex: 1;
-          min-height: 100vh;
-        }
-      `}</style>
     </div>
   );
 }
