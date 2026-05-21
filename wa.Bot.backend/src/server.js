@@ -8,22 +8,21 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 
-// ── Middleware Oficial: Parseo de JSON + Captura de rawBody para HMAC ──
+// ── Middleware Oficial: Parseo de JSON + Captura de rawBody ──
 app.use(express.json({
   verify: (req, res, buf) => {
-    req.rawBody = buf; // Necesario para validación de firmas de WhatsApp
+    req.rawBody = buf; 
   }
 }));
 app.use(express.urlencoded({ extended: true }));
 
-// ── Middleware de Seguridad (Autenticación Admin) ──
+// ── Middleware de Seguridad ──
 const adminAuth = (req, res, next) => {
   const key = req.headers['x-admin-key'];
   if (key && key === process.env.ADMIN_SECRET_KEY) {
     next();
   } else {
-    console.warn('[Security] Intento de acceso administrativo no autorizado');
-    res.status(403).json({ error: 'Acceso denegado: Clave inválida' });
+    res.status(403).json({ error: 'Acceso denegado' });
   }
 };
 
@@ -36,11 +35,12 @@ const campaignRoutes = require('./routes/campaigns');
 // ── Rutas ──────────────────────────────────────────────────────────────────
 app.get('/', (req, res) => res.json({ status: 'ok', project: 'WA.Bot' }));
 
-// Rutas de Monitoreo (Health Checks para el Dashboard)
+// Health Checks
 app.get('/health/db', (req, res) => res.json({ status: 'ok' }));
 app.get('/health/whatsapp', (req, res) => res.json({ status: 'ok' }));
 
-// Rutas Espejo (Webhook Test)
+// ── Rutas Webhook ──────────────────────────────────────────────────────────
+// Ruta de verificación (GET) para Meta
 app.get('/webhook-test', (req, res) => {
   const { 'hub.mode': mode, 'hub.verify_token': token, 'hub.challenge': challenge } = req.query;
   if (mode === 'subscribe' && token === process.env.VERIFY_TOKEN) {
@@ -49,25 +49,26 @@ app.get('/webhook-test', (req, res) => {
   return res.sendStatus(403);
 });
 
-app.post('/webhook-test', webhookController.receiveMessage || webhookController.verifyWebhook);
+// Ruta de eventos (POST): Solo ejecuta la lógica de recepción, NO de verificación
+app.post('/webhook-test', (req, res) => {
+  // Pasamos el control al controller solo para procesar el cuerpo (mensajes)
+  webhookController.receiveMessage(req, res);
+});
 
 // Rutas Estándar
 app.use('/webhook', webhookRoutes);
 app.use('/api/conversations', conversationRoutes);
 app.use('/api/campaigns', campaignRoutes);
 
-// ── Rutas Administrativas Protegidas ───────────────────────────────────────
+// ── Rutas Administrativas ──────────────────────────────────────────────────
 app.post('/api/admin/restart', adminAuth, (req, res) => {
-  console.log('[Admin] Reiniciando servicio...');
   res.json({ message: 'Servicio reiniciado' });
 });
 
 app.post('/api/admin/clear-db', adminAuth, (req, res) => {
-  console.log('[Admin] Limpiando base de datos...');
   res.json({ message: 'Base de datos limpiada' });
 });
 
-// ── Arranque del Servidor ──────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`[Server] WA.Bot corriendo en puerto ${PORT}`);
 });
