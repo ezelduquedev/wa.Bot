@@ -1,0 +1,34 @@
+{
+  "name": "wa.bot",
+  "version": "1.0.0",
+  "description": "WhatsApp Business Automation MVP",
+  "main": "server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ezelduquedev/wa.Bot.git"
+  },
+  "keywords": [],
+  "author": "Ezel Alexander Duque Arias",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/ezelduquedev/wa.Bot/issues"
+  },
+  "homepage": "https://github.com/ezelduquedev/wa.Bot#readme",
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@prisma/client": "^6.9.0",
+    "axios": "^1.9.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "prisma": "^6.9.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}

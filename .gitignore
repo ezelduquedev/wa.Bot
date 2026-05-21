@@ -1,0 +1,14 @@
+# Dependencias
+node_modules/
+wa-bot-dashboard/node_modules/
+wa.Bot.backend/node_modules/
+
+# Build
+wa-bot-dashboard/.next/
+
+# Variables de entorno
+.env
+.env.local
+
+# Prisma generado
+/generated/prisma

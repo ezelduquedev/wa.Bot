@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Contact {
+  id            String         @id @default(uuid())
+  phoneNumber   String         @unique @map("phone_number")
+  name          String?
+  createdAt     DateTime       @default(now()) @map("created_at")
+  conversations Conversation[]
+
+  @@map("contacts")
+}
+
+model Conversation {
+  id        String    @id @default(uuid())
+  contactId String    @map("contact_id")
+  status    Status    @default(OPEN)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  contact  Contact   @relation(fields: [contactId], references: [id])
+  messages Message[]
+
+  @@map("conversations")
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String       @map("conversation_id")
+  role           Role
+  content        String
+  waMessageId    String?      @map("wa_message_id")
+  timestamp      DateTime     @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+
+  @@map("messages")
+}
+
+enum Status {
+  OPEN
+  CLOSED
+}
+
+enum Role {
+  USER
+  ASSISTANT
+}
