@@ -1,78 +1,184 @@
-import Image from "next/image";
-import { Geist, Geist_Mono } from "next/font/google";
+import { useState, useEffect } from 'react';
+import Layout from '../components/Layout';
+import axios from 'axios';
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+export default function Dashboard() {
+  const [stats, setStats] = useState({ total: 0, open: 0, closed: 0 });
+  const [lastUpdate, setLastUpdate] = useState('');
 
-export default function Home() {
+  useEffect(() => {
+    fetchStats();
+    const interval = setInterval(fetchStats, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const fetchStats = async () => {
+    try {
+      const res = await axios.get(`${BACKEND_URL}/api/conversations`);
+      const convs = res.data || [];
+      const open = convs.filter(c => c.status === 'OPEN').length;
+      const closed = convs.filter(c => c.status === 'CLOSED').length;
+      setStats({ total: convs.length, open, closed });
+      setLastUpdate(new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }));
+    } catch (e) {
+      console.error('Error fetching stats:', e);
+    }
+  };
+
+  const systemStatus = [
+    { name: 'WhatsApp Cloud API', status: 'Activo', ok: true },
+    { name: 'Gemini IA', status: 'Activo', ok: true },
+    { name: 'PostgreSQL', status: 'Activo', ok: true },
+    { name: 'Deploy Railway', status: 'Activo', ok: true },
+    { name: 'Deploy Vercel', status: 'Activo', ok: true },
+  ];
+
   return (
-    <div
-      className={`${geistSans.className} ${geistMono.className} flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black`}
-    >
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the index.js file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <Layout>
+      <div className="page">
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Dashboard</h1>
+            {lastUpdate && <p className="page-sub">Última actualización: {lastUpdate}</p>}
+          </div>
+          <div className="avatar-btn">N</div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs/pages/getting-started?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        <div className="stats-grid">
+          <div className="stat-card">
+            <div className="stat-icon">💬</div>
+            <div className="stat-value">{stats.total}</div>
+            <div className="stat-label">TOTAL CONVERSACIONES</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon">🟢</div>
+            <div className="stat-value">{stats.open}</div>
+            <div className="stat-label">ABIERTAS</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon">⬜</div>
+            <div className="stat-value">{stats.closed}</div>
+            <div className="stat-label">CERRADAS</div>
+          </div>
         </div>
-      </main>
-    </div>
+
+        <div className="section">
+          <h2 className="section-title">Estado del sistema</h2>
+          <div className="status-list">
+            {systemStatus.map((item) => (
+              <div key={item.name} className="status-row">
+                <div className="status-left">
+                  <span className={`dot ${item.ok ? 'dot-green' : 'dot-orange'}`}></span>
+                  <span className="status-name">{item.name}</span>
+                </div>
+                <span className={`status-val ${item.ok ? 'val-green' : 'val-orange'}`}>
+                  {item.status}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <style jsx>{`
+        .page {
+          padding: 32px;
+          max-width: 900px;
+        }
+        .page-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          margin-bottom: 28px;
+        }
+        .page-title {
+          font-size: 26px;
+          font-weight: 700;
+          color: #111827;
+          margin: 0;
+        }
+        .page-sub {
+          font-size: 13px;
+          color: #9ca3af;
+          margin: 4px 0 0;
+        }
+        .avatar-btn {
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          background: #111827;
+          color: white;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 700;
+          font-size: 14px;
+        }
+        .stats-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 16px;
+          margin-bottom: 28px;
+        }
+        .stat-card {
+          background: white;
+          border-radius: 12px;
+          padding: 20px 24px;
+          border: 1px solid #e5e7eb;
+          display: flex;
+          align-items: center;
+          gap: 16px;
+        }
+        .stat-icon { font-size: 22px; }
+        .stat-value {
+          font-size: 28px;
+          font-weight: 800;
+          color: #111827;
+          line-height: 1;
+        }
+        .stat-label {
+          font-size: 10px;
+          color: #9ca3af;
+          font-weight: 600;
+          letter-spacing: 0.5px;
+          margin-top: 2px;
+        }
+        .section {
+          background: white;
+          border-radius: 12px;
+          border: 1px solid #e5e7eb;
+          padding: 24px;
+        }
+        .section-title {
+          font-size: 16px;
+          font-weight: 600;
+          color: #111827;
+          margin: 0 0 16px;
+        }
+        .status-list { display: flex; flex-direction: column; gap: 0; }
+        .status-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 12px 0;
+          border-bottom: 1px solid #f3f4f6;
+        }
+        .status-row:last-child { border-bottom: none; }
+        .status-left { display: flex; align-items: center; gap: 10px; }
+        .dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+        }
+        .dot-green { background: #22c55e; }
+        .dot-orange { background: #f59e0b; }
+        .status-name { font-size: 14px; color: #374151; }
+        .status-val { font-size: 13px; font-weight: 600; }
+        .val-green { color: #16a34a; }
+        .val-orange { color: #d97706; }
+      `}</style>
+    </Layout>
   );
 }
