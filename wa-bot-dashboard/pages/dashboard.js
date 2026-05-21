@@ -8,23 +8,24 @@ function StatCard({ icon, value, label, color }) {
     <div style={{
       background: '#fff',
       border: '1px solid #e5e7eb',
-      borderRadius: 12,
-      padding: '20px 24px',
+      borderRadius: 16, // Más redondeado para look moderno
+      padding: '28px',
       flex: 1,
       display: 'flex',
       alignItems: 'center',
-      gap: 16,
+      gap: 20,
+      boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', // Sombra sutil para profundidad
     }}>
       <div style={{
-        width: 44, height: 44, borderRadius: 10,
-        background: color + '15',
+        width: 52, height: 52, borderRadius: 12,
+        background: color + '10', // Color más suave
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         {icon}
       </div>
       <div>
-        <div style={{ fontSize: 28, fontWeight: 700, color: color, lineHeight: 1 }}>{value}</div>
-        <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 500 }}>{label}</div>
+        <div style={{ fontSize: 32, fontWeight: 700, color: '#111827', lineHeight: 1 }}>{value}</div>
+        <div style={{ fontSize: 13, color: '#6b7280', marginTop: 8, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>{label}</div>
       </div>
     </div>
   );
@@ -41,21 +42,19 @@ function StatusRow({ label, detail, status }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '14px 0',
-      borderBottom: '1px solid #f3f4f6',
+      padding: '18px 0',
+      borderBottom: '1px solid #f9fafb',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div style={{
-          width: 10, height: 10, borderRadius: '50%', background: cfg.dot, flexShrink: 0,
-        }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div style={{ width: 8, height: 8, borderRadius: '50%', background: cfg.dot, boxShadow: `0 0 8px ${cfg.dot}` }} />
         <div>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#111827' }}>{label}</div>
-          {detail && <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 1 }}>{detail}</div>}
+          <div style={{ fontSize: 15, fontWeight: 500, color: '#111827' }}>{label}</div>
+          {detail && <div style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>{detail}</div>}
         </div>
       </div>
       <span style={{
         fontSize: 12, fontWeight: 600, color: cfg.color,
-        background: cfg.bg, padding: '3px 10px', borderRadius: 20,
+        background: cfg.bg, padding: '4px 12px', borderRadius: 6,
       }}>
         {cfg.label}
       </span>
@@ -76,7 +75,7 @@ export default function Dashboard() {
 
   async function fetchData() {
     const now = new Date();
-    setLastUpdate(now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }));
+    setLastUpdate(now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
     try {
       const res = await fetch(`${BACKEND_URL}/api/conversations`);
       if (res.ok) {
@@ -96,78 +95,46 @@ export default function Dashboard() {
 
   return (
     <Layout>
-      <div style={{ padding: '28px 32px', maxWidth: 1100 }}>
+      <div style={{ padding: '40px 60px', maxWidth: '1200px', margin: '0 auto' }}>
+        
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 40 }}>
           <div>
-            <h1 style={{ fontSize: 24, fontWeight: 700, color: '#111827' }}>Dashboard</h1>
-            <p style={{ fontSize: 13, color: '#9ca3af', marginTop: 2 }}>Última actualización: {lastUpdate}</p>
+            <h1 style={{ fontSize: 28, fontWeight: 700, color: '#111827', margin: 0 }}>Dashboard</h1>
+            <p style={{ fontSize: 14, color: '#6b7280', marginTop: 8 }}>Estado operativo en tiempo real</p>
           </div>
-          <button
-            onClick={fetchData}
-            style={{
-              background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8,
-              padding: '8px 12px', cursor: 'pointer', color: '#6b7280', fontSize: 16,
-            }}
-          >
-            ↻
-          </button>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 6 }}>Última actualización: {lastUpdate}</div>
+            <button
+              onClick={fetchData}
+              style={{
+                background: '#111827', border: 'none', borderRadius: 8,
+                padding: '10px 20px', cursor: 'pointer', color: '#fff', fontSize: 14, fontWeight: 500,
+              }}
+            >
+              Actualizar Ahora
+            </button>
+          </div>
         </div>
 
         {/* Stat cards */}
-        <div style={{ display: 'flex', gap: 16, marginBottom: 28, marginTop: 20 }}>
-          <StatCard
-            icon={<ConvIcon color="#374151" />}
-            value={stats.total}
-            label="Total conversaciones"
-            color="#374151"
-          />
-          <StatCard
-            icon={<ConvIcon color="#25D366" />}
-            value={stats.open}
-            label="Abiertas"
-            color="#16a34a"
-          />
-          <StatCard
-            icon={<ConvIcon color="#9ca3af" />}
-            value={stats.closed}
-            label="Cerradas"
-            color="#6b7280"
-          />
+        <div style={{ display: 'flex', gap: 24, marginBottom: 40 }}>
+          <StatCard icon={<ConvIcon color="#111827" />} value={stats.total} label="Total Chats" color="#111827" />
+          <StatCard icon={<ConvIcon color="#16a34a" />} value={stats.open} label="Abiertas" color="#16a34a" />
+          <StatCard icon={<ConvIcon color="#6b7280" />} value={stats.closed} label="Cerradas" color="#6b7280" />
         </div>
 
         {/* System status */}
         <div style={{
-          background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: '20px 24px',
+          background: '#fff', border: '1px solid #e5e7eb', borderRadius: 16, padding: '32px',
+          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
         }}>
-          <h2 style={{ fontSize: 16, fontWeight: 600, color: '#111827', marginBottom: 4 }}>Estado del sistema</h2>
-          <StatusRow
-            label="WhatsApp Cloud API"
-            detail="Meta Business"
-            status="ok"
-          />
-          <StatusRow
-            label="Gemini IA"
-            detail="Integrado en backend"
-            status="ok"
-          />
-          <StatusRow
-            label="PostgreSQL"
-            detail="Railway database"
-            status="ok"
-          />
-          <StatusRow
-            label="Deploy Railway"
-            detail={BACKEND_URL}
-            status={backendOk === true ? 'ok' : backendOk === false ? 'error' : 'pending'}
-          />
-          <div style={{ borderBottom: 'none' }}>
-            <StatusRow
-              label="Deploy Vercel"
-              detail="wa-bot-iota.vercel.app"
-              status="ok"
-            />
-          </div>
+          <h2 style={{ fontSize: 18, fontWeight: 600, color: '#111827', marginBottom: 20 }}>Estado del sistema</h2>
+          <StatusRow label="WhatsApp Cloud API" detail="Meta Business" status="ok" />
+          <StatusRow label="Gemini IA" detail="Integrado en backend" status="ok" />
+          <StatusRow label="PostgreSQL" detail="Railway database" status="ok" />
+          <StatusRow label="Deploy Railway" detail={BACKEND_URL} status={backendOk === true ? 'ok' : backendOk === false ? 'error' : 'pending'} />
+          <StatusRow label="Deploy Vercel" detail="wa-bot-iota.vercel.app" status="ok" />
         </div>
       </div>
     </Layout>
@@ -176,7 +143,7 @@ export default function Dashboard() {
 
 function ConvIcon({ color }) {
   return (
-    <svg width="22" height="22" fill="none" stroke={color} strokeWidth="2" viewBox="0 0 24 24">
+    <svg width="24" height="24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
       <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
     </svg>
   );
