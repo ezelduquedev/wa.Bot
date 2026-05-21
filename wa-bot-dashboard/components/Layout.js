@@ -15,11 +15,12 @@ export default function Layout({ children }) {
   return (
     <div className="layout-container">
       <aside className="sidebar">
-        <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--green-dark)', marginBottom: 48, paddingLeft: 8 }}>
-          WA.Bot
+        <div style={{ padding: '32px 20px 24px 20px', borderBottom: '1px solid var(--sidebar-border)' }}>
+          <h2 style={{ color: 'var(--green-dark)', fontSize: '22px' }}>WA.Bot</h2>
+          <p style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600, marginTop: 4 }}>DESARROLLADO POR EZEL</p>
         </div>
 
-        <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <nav className="nav-menu">
           {navItems.map(item => {
             const active = router.pathname === item.href || router.pathname.startsWith(`${item.href}/`);
             return (
@@ -32,9 +33,7 @@ export default function Layout({ children }) {
       </aside>
 
       <main className="main-content">
-        <div style={{ maxWidth: '1600px', width: '100%', margin: '0 auto' }}>
-          {children}
-        </div>
+        <div className="content-wrapper">{children}</div>
       </main>
     </div>
   );
