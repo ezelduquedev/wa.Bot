@@ -50,7 +50,7 @@ export default function Dashboard() {
     <Layout>
       <div style={{ marginBottom: 32 }}>
         <h1 style={{ fontSize: 26, fontWeight: 800 }}>Dashboard</h1>
-        <p style={{ color: 'var(--text-muted)' }}>Resumen general de tu plataforma WA.Bot</p>
+        <p style={{ color: 'var(--text-muted)' }}>Resumen general</p>
       </div>
 
       <div className="dashboard-grid">

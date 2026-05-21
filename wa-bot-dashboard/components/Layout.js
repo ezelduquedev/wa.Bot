@@ -2,11 +2,11 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 
 const navItems = [
-  { href: '/dashboard', label: 'Dashboard' },
-  { href: '/conversations', label: 'Conversaciones' },
-  { href: '/campaigns', label: 'Campañas' },
-  { href: '/contacts', label: 'Contactos' },
-  { href: '/settings', label: 'Ajustes' },
+  { href: '/dashboard', label: 'Dashboard', icon: '📊' },
+  { href: '/conversations', label: 'Conversaciones', icon: '💬' },
+  { href: '/campaigns', label: 'Campañas', icon: '📢' },
+  { href: '/contacts', label: 'Contactos', icon: '👥' },
+  { href: '/settings', label: 'Ajustes', icon: '⚙️' },
 ];
 
 export default function Layout({ children }) {
@@ -25,6 +25,7 @@ export default function Layout({ children }) {
             const active = router.pathname === item.href || router.pathname.startsWith(`${item.href}/`);
             return (
               <Link key={item.href} href={item.href} className={`nav-link ${active ? 'active' : ''}`}>
+                <span style={{ marginRight: '10px', fontSize: '16px' }}>{item.icon}</span>
                 {item.label}
               </Link>
             );
