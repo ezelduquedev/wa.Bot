@@ -1,41 +1,225 @@
-export default function MessageBubble({ message }) {
-  const isBot = message.role === 'ASSISTANT' || message.direction === 'outbound';
+import { useState, useEffect, useRef } from 'react';
+import Layout from '../components/Layout';
+import MessageBubble from '../components/MessageBubble';
 
-  const formatTime = (dateStr) => {
-    const date = new Date(dateStr);
-    return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
+
+function Avatar({ name }) {
+  const initials = name && name !== 'Desconocido'
+    ? name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+    : '??';
+
+  return (
+    <div className="avatar">
+      {initials}
+    </div>
+  );
+}
+
+export default function Conversations() {
+  const [conversations, setConversations] = useState([]);
+  const [selected, setSelected]           = useState(null);
+  const [messages, setMessages]           = useState([]);
+
+  const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    fetchConversations();
+
+    const interval = setInterval(fetchConversations, 10000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (selected) {
+      fetchMessages(selected.id);
+    }
+  }, [selected]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({
+      behavior: 'smooth'
+    });
+  }, [messages]);
+
+  async function fetchConversations() {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/conversations`);
+
+      if (res.ok) {
+        const data = await res.json();
+
+        setConversations(
+          Array.isArray(data)
+            ? data
+            : (data.conversations || [])
+        );
+      }
+    } catch {}
+  }
+
+  async function fetchMessages(id) {
+    try {
+      const res = await fetch(
+        `${BACKEND_URL}/api/conversations/${id}/messages`
+      );
+
+      if (res.ok) {
+        const data = await res.json();
+
+        setMessages(
+          Array.isArray(data)
+            ? data
+            : (data.messages || [])
+        );
+      }
+    } catch {}
+  }
+
+  const getLastMessageText = (conv) => {
+    if (!conv.lastMessage) return 'Sin mensajes';
+
+    if (typeof conv.lastMessage === 'string') {
+      return conv.lastMessage;
+    }
+
+    return conv.lastMessage.content || 'Sin mensajes';
   };
 
   return (
-    <div style={{
-      display: 'flex',
-      justifyContent: isBot ? 'flex-end' : 'flex-start',
-      marginBottom: '8px',
-      padding: '0 16px',
-    }}>
-      <div style={{
-        maxWidth: '70%',
-        background: isBot ? '#25D366' : '#fff',
-        color: isBot ? '#fff' : '#111827',
-        borderRadius: isBot ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-        padding: '10px 14px',
-        boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
-        border: isBot ? 'none' : '1px solid #e5e7eb',
-      }}>
-        <div style={{ fontSize: '14px', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
-          {message.content}
+    <Layout fullHeight>
+
+      <div
+        className="chat-container"
+        style={{
+          display: 'flex',
+          height: 'calc(100vh - 80px)',
+          overflow: 'hidden',
+          background: '#f8fafc',
+        }}
+      >
+
+        {/* ───────────── Sidebar ───────────── */}
+        <div
+          className="chat-sidebar"
+          style={{
+            width: '340px',
+            minWidth: '340px',
+            borderRight: '1px solid #e5e7eb',
+            background: '#fff',
+            overflowY: 'auto',
+          }}
+        >
+
+          <div className="chat-list">
+
+            {conversations.map(conv => (
+              <div
+                key={conv.id}
+                onClick={() => setSelected(conv)}
+                className={`chat-item ${
+                  selected?.id === conv.id ? 'active' : ''
+                }`}
+              >
+                <Avatar name={conv.contact?.name} />
+
+                <div className="chat-info">
+                  <div className="contact-name">
+                    {
+                      conv.contact?.name ||
+                      conv.contact?.phone_number ||
+                      'Desconocido'
+                    }
+                  </div>
+
+                  <div className="last-msg">
+                    {getLastMessageText(conv)}
+                  </div>
+                </div>
+              </div>
+            ))}
+
+          </div>
         </div>
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-          gap: '4px', marginTop: '4px',
-        }}>
-          {isBot && <span style={{ fontSize: '12px' }}>🤖</span>}
-          {!isBot && <span style={{ fontSize: '12px' }}>👤</span>}
-          <span style={{ fontSize: '11px', color: isBot ? 'rgba(255,255,255,0.75)' : '#9ca3af' }}>
-            {formatTime(message.timestamp || message.createdAt)}
-          </span>
+
+        {/* ───────────── Chat Principal ───────────── */}
+        <div
+          className="chat-main"
+          style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            background: '#fff',
+          }}
+        >
+
+          {selected ? (
+            <>
+              {/* Header */}
+              <div
+                className="chat-header"
+                style={{
+                  position: 'sticky',
+                  top: 0,
+                  zIndex: 10,
+                  background: '#fff',
+                  borderBottom: '1px solid #e5e7eb',
+                  padding: '16px',
+                  flexShrink: 0,
+                }}
+              >
+                <strong>
+                  {
+                    selected.contact?.name ||
+                    selected.contact?.phone_number ||
+                    'Desconocido'
+                  }
+                </strong>
+              </div>
+
+              {/* Mensajes */}
+              <div
+                className="chat-messages"
+                style={{
+                  flex: 1,
+                  overflowY: 'auto',
+                  padding: '16px',
+                  minHeight: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px',
+                }}
+              >
+                {messages.map((msg, i) => (
+                  <MessageBubble
+                    key={msg.id || i}
+                    message={msg}
+                  />
+                ))}
+
+                <div ref={messagesEndRef} />
+              </div>
+            </>
+          ) : (
+            <div
+              className="chat-empty"
+              style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#94a3b8',
+                fontSize: '15px',
+              }}
+            >
+              Selecciona un chat
+            </div>
+          )}
+
         </div>
       </div>
-    </div>
+    </Layout>
   );
 }
