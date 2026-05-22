@@ -89,8 +89,8 @@ export default function Contacts() {
               {!loading && !error && contacts.map((c, i) => (
                 <tr key={c.id ?? i}>
                   <td style={{ fontWeight: 600 }}>
-                    {/* LÓGICA DE VISUALIZACIÓN CORREGIDA */}
-                    {c.name && c.name !== 'Desconocido' ? c.name : (c.phone || 'Sin nombre')}
+                    {/* NUEVA LÓGICA DE VISUALIZACIÓN CORREGIDA PARA EL TELÉFONO */}
+                    {c.name && c.name !== 'Desconocido' ? c.name : (c.phone ? c.phone : 'Teléfono no disponible')}
                   </td>
 
                   <td style={{ fontFamily: 'monospace' }}>
