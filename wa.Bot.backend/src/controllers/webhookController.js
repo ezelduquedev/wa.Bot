@@ -10,9 +10,7 @@ const {
 } = require('../services/dbService');
 
 const { sendWhatsAppMessage } = require('../services/whatsappService');
-
-const { generateGeminiResponse } = require('../services/geminiService');
-
+const { generateGroqResponse } = require('../services/groqService');
 const { buildStaticResponse } = require('../services/responseService');
 
 
@@ -23,8 +21,8 @@ const { buildStaticResponse } = require('../services/responseService');
 const verifyWebhook = (req, res) => {
   console.log('[Webhook] Verificación GET recibida');
 
-  const mode = req.query['hub.mode'];
-  const token = req.query['hub.verify_token'];
+  const mode      = req.query['hub.mode'];
+  const token     = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
 
   console.log('[Webhook] mode:', mode);
@@ -46,7 +44,6 @@ const verifyWebhook = (req, res) => {
 
 const receiveMessage = async (req, res) => {
 
-  // DEBUG TOTAL
   console.log('\n==============================');
   console.log('[Webhook] POST recibido');
   console.log('==============================\n');
@@ -57,12 +54,10 @@ const receiveMessage = async (req, res) => {
   console.log('\n[Webhook] Body completo:');
   console.log(JSON.stringify(req.body, null, 2));
 
-  // RESPONDER RÁPIDO A META
   res.sendStatus(200);
 
   const body = req.body;
 
-  // Validación básica
   if (!body || body.object !== 'whatsapp_business_account') {
     console.log('[Webhook] ⚠️ Evento ignorado: no es WhatsApp Business');
     return;
@@ -70,11 +65,10 @@ const receiveMessage = async (req, res) => {
 
   try {
 
-    const entry = body.entry?.[0];
-    const changes = entry?.changes?.[0]?.value;
+    const entry    = body.entry?.[0];
+    const changes  = entry?.changes?.[0]?.value;
     const messages = changes?.messages;
 
-    // Ignorar estados
     if (!messages) {
       console.log('[Webhook] ℹ️ Evento de estado recibido (ignorado)');
       return;
@@ -85,13 +79,11 @@ const receiveMessage = async (req, res) => {
     console.log('\n[Webhook] Mensaje detectado:');
     console.log(JSON.stringify(message, null, 2));
 
-    // Solo texto
     if (message.type !== 'text') {
       console.log('[Webhook] ⚠️ Mensaje no-texto ignorado');
       return;
     }
 
-    // Ejecutar lógica
     await processIncomingMessage(message);
 
   } catch (error) {
@@ -112,14 +104,13 @@ const processIncomingMessage = async (message) => {
   try {
 
     const phoneNumber = message.from;
-    const text = message.text.body;
+    const text        = message.text.body;
     const waMessageId = message.id;
-    const timestamp = new Date(parseInt(message.timestamp) * 1000);
+    const timestamp   = new Date(parseInt(message.timestamp) * 1000);
 
     console.log('\n==============================');
     console.log('[Webhook] Procesando mensaje');
     console.log('==============================');
-
     console.log('Número:', phoneNumber);
     console.log('Texto:', text);
     console.log('WA Message ID:', waMessageId);
@@ -128,65 +119,52 @@ const processIncomingMessage = async (message) => {
 
     console.log('\n[DB] Buscando/creando contacto...');
     const contact = await findOrCreateContact(phoneNumber);
-
     console.log('[DB] ✅ Contacto OK:', contact.id);
 
     // ── CONVERSACIÓN ─────────────────
 
     console.log('\n[DB] Buscando/creando conversación...');
     const conversation = await findOrCreateConversation(contact.id);
-
     console.log('[DB] ✅ Conversación OK:', conversation.id);
 
     // ── GUARDAR MENSAJE USER ─────────
 
     console.log('\n[DB] Guardando mensaje USER...');
-
     await saveMessage({
       conversationId: conversation.id,
-      role: 'USER',
-      content: text,
+      role:           'USER',
+      content:        text,
       waMessageId,
       timestamp,
     });
-
     console.log('[DB] ✅ Mensaje USER guardado');
 
     // ── HISTORIAL ────────────────────
 
     console.log('\n[DB] Obteniendo historial...');
-
     const history = await getConversationHistory(conversation.id, 10);
-
     console.log('[DB] Historial obtenido:', history.length);
 
-    const historyForGemini = history.filter(
+    const historyForGroq = history.filter(
       msg => msg.waMessageId !== waMessageId
     );
 
-    // ── GEMINI ───────────────────────
+    // ── GROQ ─────────────────────────
 
     let responseText;
 
     try {
 
-      console.log('\n[Gemini] Generando respuesta IA...');
+      console.log('\n[Groq] Generando respuesta IA...');
+      responseText = await generateGroqResponse(historyForGroq, text);
+      console.log('[Groq] ✅ Respuesta generada');
+      console.log('[Groq] Texto:', responseText);
 
-      responseText = await generateGeminiResponse(
-        historyForGemini,
-        text
-      );
+    } catch (groqError) {
 
-      console.log('[Gemini] ✅ Respuesta generada');
-      console.log('[Gemini] Texto:', responseText);
-
-    } catch (geminiError) {
-
-      console.error('\n[Gemini] ❌ ERROR');
-      console.error(geminiError);
-
-      console.log('[Gemini] Usando fallback...');
-
+      console.error('\n[Groq] ❌ ERROR');
+      console.error(groqError);
+      console.log('[Groq] Usando fallback...');
       responseText = buildStaticResponse(text);
 
     }
@@ -199,11 +177,7 @@ const processIncomingMessage = async (message) => {
 
     try {
 
-      botWaMessageId = await sendWhatsAppMessage(
-        phoneNumber,
-        responseText
-      );
-
+      botWaMessageId = await sendWhatsAppMessage(phoneNumber, responseText);
       console.log('[WhatsApp] ✅ Mensaje enviado');
       console.log('[WhatsApp] Message ID:', botWaMessageId);
 
@@ -217,15 +191,13 @@ const processIncomingMessage = async (message) => {
     // ── GUARDAR RESPUESTA BOT ────────
 
     console.log('\n[DB] Guardando mensaje ASSISTANT...');
-
     await saveMessage({
       conversationId: conversation.id,
-      role: 'ASSISTANT',
-      content: responseText,
-      waMessageId: botWaMessageId || null,
-      timestamp: new Date(),
+      role:           'ASSISTANT',
+      content:        responseText,
+      waMessageId:    botWaMessageId || null,
+      timestamp:      new Date(),
     });
-
     console.log('[DB] ✅ Mensaje ASSISTANT guardado');
 
     console.log('\n==============================');
