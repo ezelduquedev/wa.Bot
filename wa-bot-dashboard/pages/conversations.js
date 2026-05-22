@@ -1,19 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
 import Layout from '../components/Layout';
+import MessageBubble from '../components/MessageBubble';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
 
 function Avatar({ name }) {
-  const initials = name && name !== 'Desconocido' ? name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() : '??';
+  const initials = name && name !== 'Desconocido'
+    ? name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+    : '??';
   return <div className="avatar">{initials}</div>;
 }
 
 export default function Conversations() {
   const [conversations, setConversations] = useState([]);
-  const [selected, setSelected] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [filter, setFilter] = useState('all');
-  const messagesEndRef = useRef(null);
+  const [selected, setSelected]           = useState(null);
+  const [messages, setMessages]           = useState([]);
+  const messagesEndRef                    = useRef(null);
 
   useEffect(() => {
     fetchConversations();
@@ -49,22 +51,31 @@ export default function Conversations() {
     } catch {}
   }
 
+  const getLastMessageText = (conv) => {
+    if (!conv.lastMessage) return 'Sin mensajes';
+    if (typeof conv.lastMessage === 'string') return conv.lastMessage;
+    return conv.lastMessage.content || 'Sin mensajes';
+  };
+
   return (
     <Layout fullHeight>
       <div className="chat-container">
+
         {/* Panel Izquierdo: Lista */}
         <div className="chat-sidebar">
           <div className="chat-list">
             {conversations.map(conv => (
-              <div 
-                key={conv.id} 
-                onClick={() => setSelected(conv)} 
+              <div
+                key={conv.id}
+                onClick={() => setSelected(conv)}
                 className={`chat-item ${selected?.id === conv.id ? 'active' : ''}`}
               >
                 <Avatar name={conv.contact?.name} />
                 <div className="chat-info">
-                  <div className="contact-name">{conv.contact?.name || 'Desconocido'}</div>
-                  <div className="last-msg">{conv.lastMessage || 'Sin mensajes'}</div>
+                  <div className="contact-name">
+                    {conv.contact?.name || conv.contact?.phone_number || 'Desconocido'}
+                  </div>
+                  <div className="last-msg">{getLastMessageText(conv)}</div>
                 </div>
               </div>
             ))}
@@ -76,13 +87,13 @@ export default function Conversations() {
           {selected ? (
             <>
               <div className="chat-header">
-                <strong>{selected.contact?.name}</strong>
+                <strong>
+                  {selected.contact?.name || selected.contact?.phone_number || 'Desconocido'}
+                </strong>
               </div>
               <div className="chat-messages">
                 {messages.map((msg, i) => (
-                  <div key={i} className={`msg ${msg.direction}`}>
-                    {msg.content || msg.body}
-                  </div>
+                  <MessageBubble key={msg.id || i} message={msg} />
                 ))}
                 <div ref={messagesEndRef} />
               </div>
@@ -91,6 +102,7 @@ export default function Conversations() {
             <div className="chat-empty">Selecciona un chat</div>
           )}
         </div>
+
       </div>
     </Layout>
   );

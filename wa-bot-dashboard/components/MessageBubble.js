@@ -1,5 +1,5 @@
 export default function MessageBubble({ message }) {
-  const isBot = message.direction === 'outbound' || message.role === 'assistant';
+  const isBot = message.role === 'ASSISTANT' || message.direction === 'outbound';
 
   const formatTime = (dateStr) => {
     const date = new Date(dateStr);
@@ -29,14 +29,10 @@ export default function MessageBubble({ message }) {
           display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
           gap: '4px', marginTop: '4px',
         }}>
-          {isBot && (
-            <span style={{ fontSize: '12px' }}>🤖</span>
-          )}
-          {!isBot && (
-            <span style={{ fontSize: '12px' }}>👤</span>
-          )}
+          {isBot && <span style={{ fontSize: '12px' }}>🤖</span>}
+          {!isBot && <span style={{ fontSize: '12px' }}>👤</span>}
           <span style={{ fontSize: '11px', color: isBot ? 'rgba(255,255,255,0.75)' : '#9ca3af' }}>
-            {formatTime(message.createdAt)}
+            {formatTime(message.timestamp || message.createdAt)}
           </span>
         </div>
       </div>
