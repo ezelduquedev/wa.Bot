@@ -100,7 +100,7 @@ export default function Conversations() {
         }}
       >
 
-        {/* ───────────── Sidebar ───────────── */}
+        {/* Sidebar */}
         <div
           className="chat-sidebar"
           style={{
@@ -143,7 +143,7 @@ export default function Conversations() {
           </div>
         </div>
 
-        {/* ───────────── Chat Principal ───────────── */}
+        {/* Chat principal */}
         <div
           className="chat-main"
           style={{
@@ -157,7 +157,6 @@ export default function Conversations() {
 
           {selected ? (
             <>
-              {/* Header */}
               <div
                 className="chat-header"
                 style={{
@@ -179,7 +178,6 @@ export default function Conversations() {
                 </strong>
               </div>
 
-              {/* Mensajes */}
               <div
                 className="chat-messages"
                 style={{
@@ -192,10 +190,16 @@ export default function Conversations() {
                   gap: '10px',
                 }}
               >
+
+                {/* 🔥 FIX APLICADO AQUÍ */}
                 {messages.map((msg, i) => (
                   <MessageBubble
                     key={msg.id || i}
-                    message={msg}
+                    message={{
+                      ...msg,
+                      content: msg.content ?? '',
+                      role: msg.role ?? 'USER'
+                    }}
                   />
                 ))}
 
