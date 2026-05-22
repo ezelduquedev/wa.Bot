@@ -70,9 +70,6 @@ wa.Bot/
 │
 └── README.md
 
-
----
-
 ## ⚙️ Instalación local
 
 ### 1. Clonar el repositorio
@@ -102,6 +99,7 @@ PORT=3000
 NODE_ENV=development
 dashboard/.env.local
 NEXT_PUBLIC_BACKEND_URL=http://localhost:3000
+
 🧪 Ejecución en local
 Backend
 cd backend
