@@ -43,14 +43,7 @@ export default function Contacts() {
             <tbody>
               {loading && (
                 <tr>
-                  <td
-                    colSpan={3}
-                    style={{
-                      textAlign: 'center',
-                      padding: 32,
-                      color: '#888'
-                    }}
-                  >
+                  <td colSpan={3} style={{ textAlign: 'center', padding: 32, color: '#888' }}>
                     Cargando contactos...
                   </td>
                 </tr>
@@ -58,14 +51,7 @@ export default function Contacts() {
 
               {!loading && error && (
                 <tr>
-                  <td
-                    colSpan={3}
-                    style={{
-                      textAlign: 'center',
-                      padding: 32,
-                      color: '#e74c3c'
-                    }}
-                  >
+                  <td colSpan={3} style={{ textAlign: 'center', padding: 32, color: '#e74c3c' }}>
                     {error}
                   </td>
                 </tr>
@@ -73,14 +59,7 @@ export default function Contacts() {
 
               {!loading && !error && contacts.length === 0 && (
                 <tr>
-                  <td
-                    colSpan={3}
-                    style={{
-                      textAlign: 'center',
-                      padding: 32,
-                      color: '#888'
-                    }}
-                  >
+                  <td colSpan={3} style={{ textAlign: 'center', padding: 32, color: '#888' }}>
                     No hay contactos registrados.
                   </td>
                 </tr>
@@ -89,12 +68,14 @@ export default function Contacts() {
               {!loading && !error && contacts.map((c, i) => (
                 <tr key={c.id ?? i}>
                   <td style={{ fontWeight: 600 }}>
-                    {/* NUEVA LÓGICA DE VISUALIZACIÓN CORREGIDA PARA EL TELÉFONO */}
-                    {c.name && c.name !== 'Desconocido' ? c.name : (c.phone ? c.phone : 'Teléfono no disponible')}
+                    {/* BUSCAMOS EL NOMBRE, SI NO HAY, BUSCAMOS EL TELÉFONO EN VARIOS CAMPOS POSIBLES */}
+                    {c.name && c.name !== 'Desconocido' && c.name.trim() !== '' 
+                      ? c.name 
+                      : (c.phone || c.phone_number || c.id || 'Sin nombre')}
                   </td>
 
                   <td style={{ fontFamily: 'monospace' }}>
-                    {c.phone}
+                    {c.phone || 'No disponible'}
                   </td>
 
                   <td style={{ textAlign: 'center' }}>
