@@ -25,9 +25,7 @@ export default function Conversations() {
 
   useEffect(() => {
     fetchConversations();
-
     const interval = setInterval(fetchConversations, 10000);
-
     return () => clearInterval(interval);
   }, []);
 
@@ -59,22 +57,35 @@ export default function Conversations() {
     } catch {}
   }
 
+  // 🔥 AQUÍ ESTÁ LA MODIFICACIÓN IMPORTANTE
   async function fetchMessages(id) {
     try {
+      console.log('Cargando mensajes de conversación:', id);
+
       const res = await fetch(
         `${BACKEND_URL}/api/conversations/${id}/messages`
       );
 
-      if (res.ok) {
-        const data = await res.json();
+      console.log('Status mensajes:', res.status);
 
+      const data = await res.json();
+
+      console.log('Mensajes recibidos:', data);
+
+      if (res.ok) {
         setMessages(
           Array.isArray(data)
             ? data
             : (data.messages || [])
         );
+      } else {
+        console.error('Error HTTP en mensajes:', data);
+        setMessages([]);
       }
-    } catch {}
+
+    } catch (err) {
+      console.error('Error cargando mensajes:', err);
+    }
   }
 
   const getLastMessageText = (conv) => {
@@ -91,7 +102,7 @@ export default function Conversations() {
     <Layout fullHeight>
       <div className="chat-container">
 
-        {/* ───────────────── Sidebar ───────────────── */}
+        {/* Sidebar */}
         <div className="chat-sidebar">
           <div className="chat-list">
 
@@ -124,33 +135,12 @@ export default function Conversations() {
           </div>
         </div>
 
-        {/* ───────────────── Chat Principal ───────────────── */}
-        <div
-          className="chat-main"
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            height: '100%',
-            overflow: 'hidden',
-            background: '#fff',
-          }}
-        >
+        {/* Chat principal */}
+        <div className="chat-main">
 
           {selected ? (
             <>
-              {/* Header */}
-              <div
-                className="chat-header"
-                style={{
-                  position: 'sticky',
-                  top: 0,
-                  zIndex: 10,
-                  background: '#fff',
-                  borderBottom: '1px solid #e5e7eb',
-                  padding: '16px',
-                  flexShrink: 0,
-                }}
-              >
+              <div className="chat-header">
                 <strong>
                   {
                     selected.contact?.name ||
@@ -160,19 +150,7 @@ export default function Conversations() {
                 </strong>
               </div>
 
-              {/* Mensajes */}
-              <div
-                className="chat-messages"
-                style={{
-                  flex: 1,
-                  overflowY: 'auto',
-                  padding: '16px',
-                  minHeight: 0,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '10px',
-                }}
-              >
+              <div className="chat-messages">
                 {messages.map((msg, i) => (
                   <MessageBubble
                     key={msg.id || i}
@@ -184,17 +162,7 @@ export default function Conversations() {
               </div>
             </>
           ) : (
-            <div
-              className="chat-empty"
-              style={{
-                flex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#94a3b8',
-                fontSize: '15px',
-              }}
-            >
+            <div className="chat-empty">
               Selecciona un chat
             </div>
           )}
