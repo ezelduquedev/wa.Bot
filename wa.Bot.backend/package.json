@@ -20,12 +20,12 @@
   },
   "homepage": "https://github.com/ezelduquedev/wa.Bot#readme",
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
     "@prisma/client": "^6.9.0",
     "axios": "^1.9.0",
     "cors": "^2.8.5",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "groq-sdk": "^0.15.0",
     "prisma": "^6.9.0"
   },
   "devDependencies": {
