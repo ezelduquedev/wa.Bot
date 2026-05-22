@@ -1,26 +1,21 @@
 // pages/contacts.js
-
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 
 export default function Contacts() {
   const [contacts, setContacts] = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/contacts`)
-      .then(r => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      })
+      .then(r => r.json())
       .then(data => {
         setContacts(data);
         setLoading(false);
       })
-      .catch(err => {
-        console.error('Error cargando contactos:', err);
-        setError('No se pudieron cargar los contactos.');
+      .catch(() => {
+        setError('Error al cargar contactos');
         setLoading(false);
       });
   }, []);
@@ -28,37 +23,22 @@ export default function Contacts() {
   return (
     <Layout>
       <div className="content-wrapper" style={{ maxWidth: 1000 }}>
-        <h1 style={{ marginBottom: 20 }}>Contactos</h1>
-
+        <h1>Contactos</h1>
         <div className="card">
           <table className="data-table">
             <thead>
-              <tr style={{ background: '#f9fafb' }}>
-                <th>Datos (Depuración)</th>
+              <tr>
+                <th>Nombre</th>
                 <th>Teléfono</th>
                 <th>Conversaciones</th>
               </tr>
             </thead>
-
             <tbody>
-              {loading && (
-                <tr>
-                  <td colSpan={3} style={{ textAlign: 'center', padding: 32 }}>Cargando...</td>
-                </tr>
-              )}
-
-              {!loading && !error && contacts.map((c, i) => (
+              {!loading && contacts.map((c, i) => (
                 <tr key={c.id ?? i}>
-                  <td style={{ fontSize: '12px', background: '#f0f0f0' }}>
-                    {/* AQUÍ VEREMOS EXACTAMENTE QUÉ CAMPOS VIENEN DEL SERVIDOR */}
-                    <pre>{JSON.stringify(c, null, 2)}</pre>
-                  </td>
-                  <td style={{ fontFamily: 'monospace' }}>
-                    {c.phone || 'No detectado'}
-                  </td>
-                  <td style={{ textAlign: 'center' }}>
-                    {c.conversationCount ?? 0}
-                  </td>
+                  <td style={{ fontWeight: 600 }}>{c.name || 'Desconocido'}</td>
+                  <td style={{ fontFamily: 'monospace' }}>{c.phone || 'Sin número'}</td>
+                  <td style={{ textAlign: 'center' }}>{c.conversationCount ?? 0}</td>
                 </tr>
               ))}
             </tbody>

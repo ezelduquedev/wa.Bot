@@ -1,11 +1,9 @@
 // routes/contacts.js
-
 const express = require('express');
-const router  = express.Router();
+const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-// GET /api/contacts — lista de contactos con conteo de conversaciones
 router.get('/', async (req, res) => {
   try {
     const contacts = await prisma.contact.findMany({
@@ -16,7 +14,8 @@ router.get('/', async (req, res) => {
     res.json(contacts.map(c => ({
       id:                c.id,
       name:              c.name,
-      phone:             c.phone,
+      // Intentamos capturar el teléfono desde el campo que sea que esté usando tu BD
+      phone:             c.phone || c.number || c.phoneNumber || c.id, 
       createdAt:         c.createdAt,
       conversationCount: c._count.conversations
     })));
