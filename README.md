@@ -53,21 +53,18 @@ Permite recibir mensajes de WhatsApp, procesarlos con IA (Groq / Llama 3.3 70B),
 
 ## 📁 Estructura del proyecto
 wa.Bot/
-│
 ├── backend/
-│   ├── src/
-│   │   ├── routes/
-│   │   ├── controllers/
-│   │   ├── services/
-│   │   └── webhook/
-│   ├── prisma/
-│   └── server.js
-│
-├── dashboard/
-│   ├── pages/
-│   ├── components/
-│   └── styles/
-│
+│   └── src/
+│       ├── routes/
+│       ├── controllers/
+│       ├── services/
+│       └── webhook/
+├── prisma/
+├── server.js
+└── dashboard/
+    ├── pages/
+    ├── components/
+    └── styles/
 └── README.md
 
 ## ⚙️ Instalación local
