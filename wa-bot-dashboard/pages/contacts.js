@@ -34,7 +34,7 @@ export default function Contacts() {
           <table className="data-table">
             <thead>
               <tr style={{ background: '#f9fafb' }}>
-                <th>Nombre</th>
+                <th>Datos (Depuración)</th>
                 <th>Teléfono</th>
                 <th>Conversaciones</th>
               </tr>
@@ -43,41 +43,19 @@ export default function Contacts() {
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={3} style={{ textAlign: 'center', padding: 32, color: '#888' }}>
-                    Cargando contactos...
-                  </td>
-                </tr>
-              )}
-
-              {!loading && error && (
-                <tr>
-                  <td colSpan={3} style={{ textAlign: 'center', padding: 32, color: '#e74c3c' }}>
-                    {error}
-                  </td>
-                </tr>
-              )}
-
-              {!loading && !error && contacts.length === 0 && (
-                <tr>
-                  <td colSpan={3} style={{ textAlign: 'center', padding: 32, color: '#888' }}>
-                    No hay contactos registrados.
-                  </td>
+                  <td colSpan={3} style={{ textAlign: 'center', padding: 32 }}>Cargando...</td>
                 </tr>
               )}
 
               {!loading && !error && contacts.map((c, i) => (
                 <tr key={c.id ?? i}>
-                  <td style={{ fontWeight: 600 }}>
-                    {/* BUSCAMOS EL NOMBRE, SI NO HAY, BUSCAMOS EL TELÉFONO EN VARIOS CAMPOS POSIBLES */}
-                    {c.name && c.name !== 'Desconocido' && c.name.trim() !== '' 
-                      ? c.name 
-                      : (c.phone || c.phone_number || c.id || 'Sin nombre')}
+                  <td style={{ fontSize: '12px', background: '#f0f0f0' }}>
+                    {/* AQUÍ VEREMOS EXACTAMENTE QUÉ CAMPOS VIENEN DEL SERVIDOR */}
+                    <pre>{JSON.stringify(c, null, 2)}</pre>
                   </td>
-
                   <td style={{ fontFamily: 'monospace' }}>
-                    {c.phone || 'No disponible'}
+                    {c.phone || 'No detectado'}
                   </td>
-
                   <td style={{ textAlign: 'center' }}>
                     {c.conversationCount ?? 0}
                   </td>
