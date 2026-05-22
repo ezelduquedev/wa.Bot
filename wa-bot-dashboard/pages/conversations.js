@@ -8,52 +8,82 @@ function Avatar({ name }) {
   const initials = name && name !== 'Desconocido'
     ? name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
     : '??';
-  return <div className="avatar">{initials}</div>;
+
+  return (
+    <div className="avatar">
+      {initials}
+    </div>
+  );
 }
 
 export default function Conversations() {
   const [conversations, setConversations] = useState([]);
   const [selected, setSelected]           = useState(null);
   const [messages, setMessages]           = useState([]);
-  const messagesEndRef                    = useRef(null);
+
+  const messagesEndRef = useRef(null);
 
   useEffect(() => {
     fetchConversations();
+
     const interval = setInterval(fetchConversations, 10000);
+
     return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
-    if (selected) fetchMessages(selected.id);
+    if (selected) {
+      fetchMessages(selected.id);
+    }
   }, [selected]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({
+      behavior: 'smooth'
+    });
   }, [messages]);
 
   async function fetchConversations() {
     try {
       const res = await fetch(`${BACKEND_URL}/api/conversations`);
+
       if (res.ok) {
         const data = await res.json();
-        setConversations(Array.isArray(data) ? data : (data.conversations || []));
+
+        setConversations(
+          Array.isArray(data)
+            ? data
+            : (data.conversations || [])
+        );
       }
     } catch {}
   }
 
   async function fetchMessages(id) {
     try {
-      const res = await fetch(`${BACKEND_URL}/api/conversations/${id}/messages`);
+      const res = await fetch(
+        `${BACKEND_URL}/api/conversations/${id}/messages`
+      );
+
       if (res.ok) {
         const data = await res.json();
-        setMessages(Array.isArray(data) ? data : (data.messages || []));
+
+        setMessages(
+          Array.isArray(data)
+            ? data
+            : (data.messages || [])
+        );
       }
     } catch {}
   }
 
   const getLastMessageText = (conv) => {
     if (!conv.lastMessage) return 'Sin mensajes';
-    if (typeof conv.lastMessage === 'string') return conv.lastMessage;
+
+    if (typeof conv.lastMessage === 'string') {
+      return conv.lastMessage;
+    }
+
     return conv.lastMessage.content || 'Sin mensajes';
   };
 
@@ -61,48 +91,115 @@ export default function Conversations() {
     <Layout fullHeight>
       <div className="chat-container">
 
-        {/* Panel Izquierdo: Lista */}
+        {/* ───────────────── Sidebar ───────────────── */}
         <div className="chat-sidebar">
           <div className="chat-list">
+
             {conversations.map(conv => (
               <div
                 key={conv.id}
                 onClick={() => setSelected(conv)}
-                className={`chat-item ${selected?.id === conv.id ? 'active' : ''}`}
+                className={`chat-item ${
+                  selected?.id === conv.id ? 'active' : ''
+                }`}
               >
                 <Avatar name={conv.contact?.name} />
+
                 <div className="chat-info">
                   <div className="contact-name">
-                    {conv.contact?.name || conv.contact?.phone_number || 'Desconocido'}
+                    {
+                      conv.contact?.name ||
+                      conv.contact?.phone_number ||
+                      'Desconocido'
+                    }
                   </div>
-                  <div className="last-msg">{getLastMessageText(conv)}</div>
+
+                  <div className="last-msg">
+                    {getLastMessageText(conv)}
+                  </div>
                 </div>
               </div>
             ))}
+
           </div>
         </div>
 
-        {/* Panel Derecho: Chat */}
-        <div className="chat-main">
+        {/* ───────────────── Chat Principal ───────────────── */}
+        <div
+          className="chat-main"
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            height: '100%',
+            overflow: 'hidden',
+            background: '#fff',
+          }}
+        >
+
           {selected ? (
             <>
-              <div className="chat-header">
+              {/* Header */}
+              <div
+                className="chat-header"
+                style={{
+                  position: 'sticky',
+                  top: 0,
+                  zIndex: 10,
+                  background: '#fff',
+                  borderBottom: '1px solid #e5e7eb',
+                  padding: '16px',
+                  flexShrink: 0,
+                }}
+              >
                 <strong>
-                  {selected.contact?.name || selected.contact?.phone_number || 'Desconocido'}
+                  {
+                    selected.contact?.name ||
+                    selected.contact?.phone_number ||
+                    'Desconocido'
+                  }
                 </strong>
               </div>
-              <div className="chat-messages">
+
+              {/* Mensajes */}
+              <div
+                className="chat-messages"
+                style={{
+                  flex: 1,
+                  overflowY: 'auto',
+                  padding: '16px',
+                  minHeight: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px',
+                }}
+              >
                 {messages.map((msg, i) => (
-                  <MessageBubble key={msg.id || i} message={msg} />
+                  <MessageBubble
+                    key={msg.id || i}
+                    message={msg}
+                  />
                 ))}
+
                 <div ref={messagesEndRef} />
               </div>
             </>
           ) : (
-            <div className="chat-empty">Selecciona un chat</div>
+            <div
+              className="chat-empty"
+              style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#94a3b8',
+                fontSize: '15px',
+              }}
+            >
+              Selecciona un chat
+            </div>
           )}
-        </div>
 
+        </div>
       </div>
     </Layout>
   );
