@@ -14,6 +14,7 @@ app.use(express.json({
     req.rawBody = buf; 
   }
 }));
+
 app.use(express.urlencoded({ extended: true }));
 
 // ── Middleware de Seguridad ──
@@ -39,23 +40,32 @@ app.get('/', (req, res) => res.json({ status: 'ok', project: 'WA.Bot' }));
 app.get('/health/db', (req, res) => res.json({ status: 'ok' }));
 app.get('/health/whatsapp', (req, res) => res.json({ status: 'ok' }));
 
-// ── Rutas Webhook ──────────────────────────────────────────────────────────
+// ── RUTAS WEBHOOK TEST ─────────────────────────────────────────────────────
+
 // Ruta de verificación (GET) para Meta
 app.get('/webhook-test', (req, res) => {
   const { 'hub.mode': mode, 'hub.verify_token': token, 'hub.challenge': challenge } = req.query;
+
   if (mode === 'subscribe' && token === process.env.VERIFY_TOKEN) {
     return res.status(200).send(challenge);
   }
+
   return res.sendStatus(403);
 });
 
-// Ruta de eventos (POST): Solo ejecuta la lógica de recepción, NO de verificación
+// Ruta de eventos (POST) test controller
 app.post('/webhook-test', (req, res) => {
-  // Pasamos el control al controller solo para procesar el cuerpo (mensajes)
   webhookController.receiveMessage(req, res);
 });
 
-// Rutas Estándar
+// ── 🔥 DEBUG CRÍTICO: WEBHOOK DIRECTO ──
+// (ESTO ES SOLO PARA VER SI META ESTÁ LLEGANDO A RAILWAY)
+app.post('/webhook', (req, res) => {
+  console.log("🔥 WEBHOOK DIRECT HIT:", JSON.stringify(req.body, null, 2));
+  res.sendStatus(200);
+});
+
+// ── Rutas Estándar ─────────────────────────────────────────────────────────
 app.use('/webhook', webhookRoutes);
 app.use('/api/conversations', conversationRoutes);
 app.use('/api/campaigns', campaignRoutes);
