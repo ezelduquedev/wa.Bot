@@ -1,5 +1,8 @@
 // server.js
-require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
+
+require('dotenv').config({
+  path: require('path').join(__dirname, '../.env')
+});
 
 const express = require('express');
 const cors = require('cors');
@@ -7,34 +10,51 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// ─────────────────────────────────────────────────────────────
+// Middlewares
+// ─────────────────────────────────────────────────────────────
+
 app.use(cors());
 
 app.use(express.json({
-  verify: (req, res, buf) => { req.rawBody = buf; }
+  verify: (req, res, buf) => {
+    req.rawBody = buf;
+  }
 }));
 
 app.use(express.urlencoded({ extended: true }));
 
-// ── Middleware de Seguridad ──────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// Middleware Seguridad Admin
+// ─────────────────────────────────────────────────────────────
+
 const adminAuth = (req, res, next) => {
+
   const key = req.headers['x-admin-key'];
 
   if (key && key === process.env.ADMIN_SECRET_KEY) {
     return next();
   }
 
-  res.status(403).json({ error: 'Acceso denegado' });
+  return res.status(403).json({
+    error: 'Acceso denegado'
+  });
 };
 
-// ── Importaciones ────────────────────────────────────────────────────────
-const webhookController  = require('./controllers/webhookController');
+// ─────────────────────────────────────────────────────────────
+// Importaciones
+// ─────────────────────────────────────────────────────────────
 
-const webhookRoutes      = require('./routes/webhook');
+const webhookRoutes = require('./routes/webhook');
+
 const conversationRoutes = require('./routes/conversations');
-const contactsRoutes     = require('./routes/contacts'); // ✅ NUEVO
-const campaignRoutes     = require('./routes/campaigns');
+const contactsRoutes = require('./routes/contacts');
+const campaignRoutes = require('./routes/campaigns');
 
-// ── Rutas base ───────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// Health checks
+// ─────────────────────────────────────────────────────────────
+
 app.get('/', (req, res) => {
   res.json({
     status: 'ok',
@@ -43,72 +63,123 @@ app.get('/', (req, res) => {
 });
 
 app.get('/health/db', (req, res) => {
-  res.json({ status: 'ok' });
+  res.json({
+    status: 'ok'
+  });
 });
 
 app.get('/health/whatsapp', (req, res) => {
-  res.json({ status: 'ok' });
+  res.json({
+    status: 'ok'
+  });
 });
 
-// ── Webhook principal (Meta lo usa aquí) ─────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// Webhook WhatsApp
+// IMPORTANTE:
+// Solo dejamos UNA definición del webhook
+// ─────────────────────────────────────────────────────────────
 
-// ✅ GET: verificación de Meta
-app.get('/webhook', (req, res) => {
-  const mode      = req.query['hub.mode'];
-  const token     = req.query['hub.verify_token'];
-  const challenge = req.query['hub.challenge'];
-
-  console.log('[Webhook] Verificación GET recibida');
-  console.log('[Webhook] mode:', mode, '| token:', token);
-
-  if (mode === 'subscribe' && token === process.env.VERIFY_TOKEN) {
-    console.log('[Webhook] ✅ Verificación correcta');
-    return res.status(200).send(challenge);
-  }
-
-  console.log('[Webhook] ❌ Verificación fallida');
-  return res.sendStatus(403);
-});
-
-// ✅ POST: mensajes entrantes — delega a webhookRoutes
 app.use('/webhook', webhookRoutes);
 
-// ── Webhook test (opcional, para pruebas) ────────────────────────────────
-app.get('/webhook-test', (req, res) => {
-  const {
-    'hub.mode': mode,
-    'hub.verify_token': token,
-    'hub.challenge': challenge
-  } = req.query;
+// ─────────────────────────────────────────────────────────────
+// Webhook test opcional
+// ─────────────────────────────────────────────────────────────
 
-  if (mode === 'subscribe' && token === process.env.VERIFY_TOKEN) {
+app.get('/webhook-test', (req, res) => {
+
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+
+  console.log('[Webhook-Test] Query:', req.query);
+
+  if (
+    mode === 'subscribe' &&
+    token === process.env.VERIFY_TOKEN
+  ) {
+    console.log('[Webhook-Test] ✅ Verificación correcta');
+
     return res.status(200).send(challenge);
   }
+
+  console.log('[Webhook-Test] ❌ Verificación fallida');
 
   return res.sendStatus(403);
 });
 
-app.post('/webhook-test', (req, res) => {
-  webhookController.receiveMessage(req, res);
-});
+// ─────────────────────────────────────────────────────────────
+// APIs
+// ─────────────────────────────────────────────────────────────
 
-// ── Rutas API ────────────────────────────────────────────────────────────
 app.use('/api/conversations', conversationRoutes);
 
-app.use('/api/contacts', contactsRoutes); // ✅ NUEVO
+app.use('/api/contacts', contactsRoutes);
 
 app.use('/api/campaigns', campaignRoutes);
 
-// ── Rutas Administrativas ────────────────────────────────────────────────
-app.post('/api/admin/restart', adminAuth, (req, res) => {
-  res.json({ message: 'Servicio reiniciado' });
+// ─────────────────────────────────────────────────────────────
+// Admin
+// ─────────────────────────────────────────────────────────────
+
+// ⚠️ Ahora mismo es solo respuesta fake.
+// No reinicia realmente el servicio.
+
+app.post('/api/admin/restart', adminAuth, async (req, res) => {
+
+  try {
+
+    console.log('[Admin] Solicitud reinicio');
+
+    return res.json({
+      success: true,
+      message: 'Servicio reiniciado'
+    });
+
+  } catch (error) {
+
+    console.error(error);
+
+    return res.status(500).json({
+      success: false,
+      error: 'Error reiniciando servicio'
+    });
+  }
+
 });
 
-app.post('/api/admin/clear-db', adminAuth, (req, res) => {
-  res.json({ message: 'Base de datos limpiada' });
+// ⚠️ Ahora mismo es solo respuesta fake.
+// No limpia DB realmente.
+
+app.post('/api/admin/clear-db', adminAuth, async (req, res) => {
+
+  try {
+
+    console.log('[Admin] Solicitud limpiar DB');
+
+    return res.json({
+      success: true,
+      message: 'Base de datos limpiada'
+    });
+
+  } catch (error) {
+
+    console.error(error);
+
+    return res.status(500).json({
+      success: false,
+      error: 'Error limpiando base de datos'
+    });
+  }
+
 });
 
-// ── Inicio servidor ──────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// Inicio servidor
+// ─────────────────────────────────────────────────────────────
+
 app.listen(PORT, () => {
+
   console.log(`[Server] WA.Bot corriendo en puerto ${PORT}`);
+
 });
