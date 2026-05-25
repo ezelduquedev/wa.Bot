@@ -63,26 +63,15 @@ const extractEmail = (text) => {
   return m ? m[0].toLowerCase() : null;
 };
 
-/**
- * Detecta horas en formatos:
- *   "a las 11", "las 11:30", "11:00", "11h", "a las 9 de la mañana"
- */
 const extractTime = (text) => {
   const m = text.match(
     /(?:a\s+)?las?\s+(\d{1,2})(?::(\d{2}))?|(\d{1,2}):(\d{2})/i
   );
   if (!m) return null;
-  // Formato explícito HH:MM
   if (m[3] !== undefined) return `${m[3]}:${m[4]}`;
-  // Formato "las X" con o sin minutos
-  const h = m[1];
-  const min = m[2] || '00';
-  return `${h}:${min}`;
+  return `${m[1]}:${m[2] || '00'}`;
 };
 
-/**
- * Detecta fechas: mañana, pasado mañana, días de semana, "27 de mayo"
- */
 const extractDate = (text) => {
   const lower = text.toLowerCase();
   if (/pasado\s+ma[ñn]ana/.test(lower)) return 'pasado mañana';
@@ -104,23 +93,27 @@ const extractDate = (text) => {
   return null;
 };
 
-/**
- * Detecta nombres con prefijos explícitos ("me llamo X", "soy X")
- * o bien un patrón "Nombre Apellido" cuando ya tenemos email
- * (el usuario suele enviar: "Nombre Apellido, email@x.com, hora")
- */
 const extractName = (text) => {
-  // Patrones con prefijo
+  // Prefijos explícitos: "me llamo X", "soy X", "mi nombre es X"
   const explicit = text.match(
     /(?:me llamo|soy|mi nombre es)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){0,3})/i
   );
   if (explicit) return explicit[1].trim();
 
-  // Patrón "Nombre Apellido, email" (el usuario manda todo junto)
+  // "Nombre Apellido, email" todo junto
   const withEmail = text.match(
     /^([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){0,3})\s*,/
   );
   if (withEmail) return withEmail[1].trim();
+
+  // Nombre solo: 1-4 palabras capitalizadas, sin email ni números
+  // Cubre el caso más común: el bot pregunta el nombre y el usuario responde "Ezel Alexander"
+  const isCleanName =
+    /^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){0,3}$/.test(text.trim()) &&
+    !text.includes('@') &&
+    !/\d/.test(text);
+
+  if (isCleanName) return text.trim();
 
   return null;
 };
@@ -130,7 +123,6 @@ const extractName = (text) => {
 // ─────────────────────────────────────────────────────────────
 
 const detectConversationState = (history, userMessage) => {
-  // Solo los mensajes del usuario, en orden
   const userMessages = [
     ...history.filter(h => h.role === 'USER').map(h => h.content),
     userMessage,
@@ -146,7 +138,6 @@ const detectConversationState = (history, userMessage) => {
     appointmentCompleted: false,
   };
 
-  // Extraer datos recorriendo cada mensaje (primero en ganar)
   for (const msg of userMessages) {
     if (!state.email) state.email = extractEmail(msg);
     if (!state.time)  state.time  = extractTime(msg);
@@ -154,7 +145,6 @@ const detectConversationState = (history, userMessage) => {
     if (!state.name)  state.name  = extractName(msg);
   }
 
-  // Detección de servicio (en todo el texto de usuario)
   const fullText = userMessages.join(' ').toLowerCase();
 
   if (/\bapp\b|ios|android/.test(fullText)) {
@@ -167,7 +157,6 @@ const detectConversationState = (history, userMessage) => {
     state.interestedService = 'business';
   }
 
-  // Intención positiva (solo en el mensaje actual)
   const positiveWords = [
     'si', 'sí', 'vale', 'perfecto', 'me interesa',
     'quiero', 'agendar', 'claro', 'ok', 'okay', 'genial',
@@ -176,7 +165,6 @@ const detectConversationState = (history, userMessage) => {
     userMessage.toLowerCase().includes(w)
   );
 
-  // Cita completa: necesita los 4 datos
   if (state.name && state.email && state.date && state.time) {
     state.appointmentCompleted = true;
   }
@@ -211,7 +199,7 @@ const buildStatePrompt = (state) => {
     lines.push('NO vuelvas a preguntar por estos datos.');
   }
 
-  if (missing.length && state.appointmentAccepted) {
+  if (missing.length) {
     lines.push(`Datos que faltan → ${missing.join(', ')}`);
     lines.push('Pide SOLO el primero de la lista. Una pregunta por mensaje.');
   }
@@ -236,9 +224,7 @@ const generateGroqResponse = async (history, userMessage) => {
 
   console.log('[Groq] Estado detectado:', JSON.stringify(state));
 
-  // ── Respuesta controlada cuando la cita está completa ──
   if (state.appointmentCompleted) {
-    // Envía emails sin bloquear la respuesta al usuario
     sendAppointmentEmails({
       name:  state.name,
       email: state.email,
@@ -252,7 +238,6 @@ const generateGroqResponse = async (history, userMessage) => {
     );
   }
 
-  // ── Construcción de mensajes para Groq ────────────────
   const formattedHistory = history.map(msg => ({
     role:    msg.role === 'USER' ? 'user' : 'assistant',
     content: msg.content,
