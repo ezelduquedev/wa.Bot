@@ -11,5 +11,24 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.14"
-  }
+  },
+  "name": "wabot",
+  "version": "1.0.0",
+  "description": "WA.Bot es un sistema de automatización de atención al cliente para WhatsApp Business que integra inteligencia artificial, base de datos y un dashboard administrativo en tiempo real.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ezelduquedev/wa.Bot.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/ezelduquedev/wa.Bot/issues"
+  },
+  "homepage": "https://github.com/ezelduquedev/wa.Bot#readme"
 }
