@@ -1,12 +1,10 @@
 // services/groqService.js
-
 const Groq = require('groq-sdk');
 const { sendAppointmentEmails } = require('./emailService');
 const { closeConversation } = require('./dbService');
 
 const SYSTEM_PROMPT = `
 Eres el asistente comercial de Ezel Dev, una agencia especializada en desarrollo web, apps, automatización y soluciones digitales para empresas.
-
 Tu objetivo es:
 - Entender qué necesita el cliente.
 - Hacer preguntas útiles y naturales.
@@ -56,7 +54,7 @@ Habla como una conversación real de WhatsApp. Nunca uses markdown.
 `.trim();
 
 // ─────────────────────────────────────────────────────────────
-// EXTRACTORES
+// EXTRACTORES (Regex originales)
 // ─────────────────────────────────────────────────────────────
 
 const extractEmail = (text) => {
@@ -65,9 +63,7 @@ const extractEmail = (text) => {
 };
 
 const extractTime = (text) => {
-  const m = text.match(
-    /(?:a\s+)?las?\s+(\d{1,2})(?::(\d{2}))?|(\d{1,2}):(\d{2})/i
-  );
+  const m = text.match(/(?:a\s+)?las?\s+(\d{1,2})(?::(\d{2}))?|(\d{1,2}):(\d{2})/i);
   if (!m) return null;
   if (m[3] !== undefined) return `${m[3]}:${m[4]}`;
   return `${m[1]}:${m[2] || '00'}`;
@@ -78,44 +74,19 @@ const extractDate = (text) => {
   if (/pasado\s+ma[ñn]ana/.test(lower)) return 'pasado mañana';
   if (/ma[ñn]ana/.test(lower)) return 'mañana';
   const days = ['lunes','martes','miércoles','miercoles','jueves','viernes','sábado','sabado','domingo'];
-  for (const d of days) {
-    if (lower.includes(d)) return d;
-  }
-  const dm = lower.match(
-    /(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/
-  );
-  if (dm) return dm[0];
-  return null;
+  for (const d of days) { if (lower.includes(d)) return d; }
+  const dm = lower.match(/(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/);
+  return dm ? dm[0] : null;
 };
 
-const NAME_BLACKLIST = new Set([
-  'hola','buenas','hello','hi','ok','okay','vale','sí','si','no',
-  'gracias','perfecto','claro','genial','bien','bueno','oye','oiga',
-  'disculpa','perdona','mañana','pasado','lunes','martes','miércoles',
-  'miercoles','jueves','viernes','sábado','sabado','domingo',
-]);
+const NAME_BLACKLIST = new Set(['hola','buenas','hello','hi','ok','okay','vale','sí','si','no','gracias','perfecto','claro','genial','bien','bueno','oye','oiga','disculpa','perdona','mañana','pasado','lunes','martes','miércoles','miercoles','jueves','viernes','sábado','sabado','domingo']);
 
 const extractName = (text) => {
-  const explicit = text.match(
-    /(?:me llamo|soy|mi nombre es)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñA-Za-z]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñA-Za-z]+){0,3})/i
-  );
+  const explicit = text.match(/(?:me llamo|soy|mi nombre es)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñA-Za-z]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñA-Za-z]+){0,3})/i);
   if (explicit) return explicit[1].trim();
-
-  const withEmail = text.match(
-    /^([A-ZÁÉÍÓÚÑ][a-záéíóúñA-Za-z]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñA-Za-z]+){0,3})\s*,/
-  );
-  if (withEmail) return withEmail[1].trim();
-
   const trimmed = text.trim();
-  const isCleanName =
-    /^[A-ZÁÉÍÓÚÑ][a-záéíóúñA-Za-z]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñA-Za-z]+){0,3}$/.test(trimmed) &&
-    !trimmed.includes('@') &&
-    !/\d/.test(trimmed) &&
-    trimmed.split(' ').length >= 2 &&
-    !trimmed.split(' ').some(w => NAME_BLACKLIST.has(w.toLowerCase()));
-
-  if (isCleanName) return trimmed;
-  return null;
+  const isCleanName = /^[A-ZÁÉÍÓÚÑ][a-záéíóúñA-Za-z]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñA-Za-z]+){0,3}$/.test(trimmed) && !trimmed.includes('@') && !/\d/.test(trimmed) && trimmed.split(' ').length >= 2 && !trimmed.split(' ').some(w => NAME_BLACKLIST.has(w.toLowerCase()));
+  return isCleanName ? trimmed : null;
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -123,69 +94,32 @@ const extractName = (text) => {
 // ─────────────────────────────────────────────────────────────
 
 const detectConversationState = (history, userMessage) => {
-  const userMessages = [
-    ...history.filter(h => h.role === 'USER').map(h => h.content),
-    userMessage,
-  ];
-
-  const state = {
-    interestedService: null,
-    appointmentAccepted: false,
-    isCollecting: false,
-    name: null,
-    email: null,
-    date: null,
-    time: null,
-    appointmentCompleted: false,
-  };
-
+  const userMessages = [...history.filter(h => h.role === 'USER').map(h => h.content), userMessage];
+  const state = { interestedService: null, appointmentAccepted: false, isCollecting: false, name: null, email: null, date: null, time: null, appointmentCompleted: false };
   for (const msg of userMessages) {
-    const foundEmail = extractEmail(msg);
-    if (foundEmail) state.email = foundEmail;
-
+    if (!state.email) state.email = extractEmail(msg);
     if (!state.time) state.time = extractTime(msg);
     if (!state.date) state.date = extractDate(msg);
-
-    const foundName = extractName(msg);
-    if (foundName) state.name = foundName;
+    if (!state.name) state.name = extractName(msg);
   }
-
   const fullText = userMessages.join(' ').toLowerCase();
-
-  if (/\bapp\b|ios|android/.test(fullText)) {
-    state.interestedService = 'apps';
-  } else if (/web|p[aá]gina|tienda\s+online/.test(fullText)) {
-    state.interestedService = 'web';
-  } else if (/\bbot\b|chatbot/.test(fullText)) {
-    state.interestedService = 'chatbots';
-  } else if (/empresa|api|automatizaci[oó]n|integraci[oó]n|facturas/.test(fullText)) {
-    state.interestedService = 'business';
-  }
-
+  if (/\bapp\b|ios|android/.test(fullText)) state.interestedService = 'apps';
+  else if (/web|p[aá]gina|tienda\s+online/.test(fullText)) state.interestedService = 'web';
+  else if (/\bbot\b|chatbot/.test(fullText)) state.interestedService = 'chatbots';
+  else if (/empresa|api|automatizaci[oó]n|integraci[oó]n|facturas/.test(fullText)) state.interestedService = 'business';
+  
   const positiveWords = ['si','sí','vale','perfecto','me interesa','quiero','agendar','claro','ok','okay','genial'];
   state.appointmentAccepted = positiveWords.some(w => userMessage.toLowerCase().includes(w));
-
-  state.isCollecting =
-    state.appointmentAccepted ||
-    !!(state.name || state.email || state.date || state.time);
-
-  if (state.name && state.email && state.date && state.time) {
-    state.appointmentCompleted = true;
-  }
-
+  state.isCollecting = state.appointmentAccepted || !!(state.name || state.email || state.date || state.time);
+  if (state.name && state.email && state.date && state.time) state.appointmentCompleted = true;
   return state;
 };
 
-// ─────────────────────────────────────────────────────────────
-// RESPUESTAS HARDCODEADAS PARA RECOGIDA DE DATOS
-// El modelo NO interviene aquí — cero alucinaciones
-// ─────────────────────────────────────────────────────────────
-
 const getCollectionResponse = (state) => {
-  if (!state.name)  return '¿Cuál es tu nombre completo?';
+  if (!state.name) return '¿Cuál es tu nombre completo?';
   if (!state.email) return '¿Cuál es tu correo electrónico?';
-  if (!state.date)  return '¿Qué día te viene bien para la llamada?';
-  if (!state.time)  return '¿A qué hora te llamo?';
+  if (!state.date) return '¿Qué día te viene bien para la llamada?';
+  if (!state.time) return '¿A qué hora te llamo?';
   return null;
 };
 
@@ -195,62 +129,48 @@ const getCollectionResponse = (state) => {
 
 const generateGroqResponse = async (history, userMessage, conversationId) => {
   const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) throw new Error('[Groq] GROQ_API_KEY no configurada');
-
   const groq = new Groq({ apiKey });
+
+  // 1. INTELIGENCIA DE EXTRACCIÓN (NUEVO)
+  const extractionPrompt = `Extrae name, email, date, time del mensaje. Responde SOLO en JSON. Si no existe, pon null. Mensaje: "${userMessage}"`;
+  const extraction = await groq.chat.completions.create({
+    model: 'llama-3.3-70b-versatile',
+    messages: [{ role: 'user', content: extractionPrompt }],
+    response_format: { type: "json_object" },
+    temperature: 0,
+  });
+  const aiExtracted = JSON.parse(extraction.choices[0].message.content);
+
+  // 2. DETECCIÓN DE ESTADO (Consolidada)
   const state = detectConversationState(history, userMessage);
+  state.name = state.name || aiExtracted.name;
+  state.email = state.email || aiExtracted.email;
+  state.date = state.date || aiExtracted.date;
+  state.time = state.time || aiExtracted.time;
+  state.isCollecting = !!(state.name || state.email || state.date || state.time || state.appointmentAccepted);
+  if (state.name && state.email && state.date && state.time) state.appointmentCompleted = true;
 
-  console.log('[Groq] Estado:', JSON.stringify(state));
+  console.log('[Groq] Estado Consolidado:', JSON.stringify(state));
 
-  // ── 1. Cita completa → confirmar, cerrar conversación y enviar email ──
   if (state.appointmentCompleted) {
-    sendAppointmentEmails({
-      name:  state.name,
-      email: state.email,
-      date:  state.date,
-      time:  state.time,
-    });
-
-    if (conversationId) {
-      await closeConversation(conversationId);
-    }
-
-    return (
-      `¡Perfecto, ${state.name}! 🙌 Cita confirmada para el ${state.date} a las ${state.time}. ` +
-      `Te hemos enviado los detalles a ${state.email}. ¡Hasta entonces!`
-    );
+    sendAppointmentEmails({ name: state.name, email: state.email, date: state.date, time: state.time });
+    if (conversationId) await closeConversation(conversationId);
+    return `¡Perfecto, ${state.name}! 🙌 Cita confirmada para el ${state.date} a las ${state.time}. Detalles enviados a ${state.email}.`;
   }
 
-  // ── 2. Recogiendo datos → respuesta hardcodeada, sin LLM ──
   if (state.isCollecting) {
     const next = getCollectionResponse(state);
     if (next) return next;
   }
 
-  // ── 3. Conversación libre → LLM ──
-  const formattedHistory = history.map(msg => ({
-    role:    msg.role === 'USER' ? 'user' : 'assistant',
-    content: msg.content,
-  }));
-
-  const messages = [
-    { role: 'system', content: SYSTEM_PROMPT },
-    ...formattedHistory,
-    { role: 'user', content: userMessage },
-  ];
-
   const completion = await groq.chat.completions.create({
-    model:       'llama-3.3-70b-versatile',
-    messages,
+    model: 'llama-3.3-70b-versatile',
+    messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...history.map(h => ({ role: h.role === 'USER' ? 'user' : 'assistant', content: h.content })), { role: 'user', content: userMessage }],
     temperature: 0.4,
-    max_tokens:  300,
+    max_tokens: 300,
   });
 
-  const responseText = completion.choices?.[0]?.message?.content?.trim();
-  if (!responseText) throw new Error('[Groq] Respuesta vacía');
-
-  console.log(`[Groq] Respuesta LLM (${responseText.length} chars)`);
-  return responseText;
+  return completion.choices[0].message.content.trim();
 };
 
 module.exports = { generateGroqResponse };
