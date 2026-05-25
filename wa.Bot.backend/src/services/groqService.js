@@ -1,9 +1,8 @@
+// services/groqService.js
+
 const Groq = require('groq-sdk');
 const { sendAppointmentEmails } = require('./emailService');
-
-// ─────────────────────────────────────────────────────────────
-// SYSTEM PROMPT
-// ─────────────────────────────────────────────────────────────
+const { closeConversation } = require('./dbService'); // ← nuevo
 
 const SYSTEM_PROMPT = `
 Eres el asistente comercial de Ezel Dev, una agencia especializada en desarrollo web, apps, automatización y soluciones digitales para empresas.
@@ -49,19 +48,13 @@ Información de la empresa:
 Habla como una conversación real de WhatsApp. Nunca uses markdown.
 `.trim();
 
-// ─────────────────────────────────────────────────────────────
-// EXTRACTORES
-// ─────────────────────────────────────────────────────────────
-
 const extractEmail = (text) => {
   const m = text.match(/[^\s@]+@[^\s@]+\.[^\s@]+/);
   return m ? m[0].toLowerCase() : null;
 };
 
 const extractTime = (text) => {
-  const m = text.match(
-    /(?:a\s+)?las?\s+(\d{1,2})(?::(\d{2}))?|(\d{1,2}):(\d{2})/i
-  );
+  const m = text.match(/(?:a\s+)?las?\s+(\d{1,2})(?::(\d{2}))?|(\d{1,2}):(\d{2})/i);
   if (!m) return null;
   if (m[3] !== undefined) return `${m[3]}:${m[4]}`;
   return `${m[1]}:${m[2] || '00'}`;
@@ -75,37 +68,23 @@ const extractDate = (text) => {
   for (const d of days) {
     if (lower.includes(d)) return d;
   }
-  const dm = lower.match(
-    /(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/
-  );
+  const dm = lower.match(/(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/);
   if (dm) return dm[0];
   return null;
 };
 
 const extractName = (text) => {
-  const explicit = text.match(
-    /(?:me llamo|soy|mi nombre es)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){0,3})/i
-  );
+  const explicit = text.match(/(?:me llamo|soy|mi nombre es)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){0,3})/i);
   if (explicit) return explicit[1].trim();
-
-  const withEmail = text.match(
-    /^([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){0,3})\s*,/
-  );
+  const withEmail = text.match(/^([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){0,3})\s*,/);
   if (withEmail) return withEmail[1].trim();
-
-  // Nombre solo: palabras capitalizadas, sin email ni números
   const isCleanName =
     /^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){0,3}$/.test(text.trim()) &&
     !text.includes('@') &&
     !/\d/.test(text);
-
   if (isCleanName) return text.trim();
   return null;
 };
-
-// ─────────────────────────────────────────────────────────────
-// DETECTOR DE ESTADO
-// ─────────────────────────────────────────────────────────────
 
 const detectConversationState = (history, userMessage) => {
   const userMessages = [
@@ -143,12 +122,9 @@ const detectConversationState = (history, userMessage) => {
     state.interestedService = 'business';
   }
 
-  // Detectar si el usuario aceptó la llamada en CUALQUIER momento del historial
   const positiveWords = ['si','sí','vale','perfecto','me interesa','quiero','agendar','claro','ok','okay','genial'];
-  const allUserText = userMessages.join(' ').toLowerCase();
   state.appointmentAccepted = positiveWords.some(w => userMessage.toLowerCase().includes(w));
 
-  // isCollecting: el usuario aceptó en algún momento O ya tenemos algún dato de cita
   state.isCollecting =
     state.appointmentAccepted ||
     !!(state.name || state.email || state.date || state.time);
@@ -160,11 +136,6 @@ const detectConversationState = (history, userMessage) => {
   return state;
 };
 
-// ─────────────────────────────────────────────────────────────
-// RESPUESTAS HARDCODEADAS PARA RECOGIDA DE DATOS
-// El modelo NO interviene aquí — cero alucinaciones
-// ─────────────────────────────────────────────────────────────
-
 const getCollectionResponse = (state) => {
   if (!state.name)  return '¿Cuál es tu nombre completo?';
   if (!state.email) return '¿Cuál es tu correo electrónico?';
@@ -173,11 +144,8 @@ const getCollectionResponse = (state) => {
   return null;
 };
 
-// ─────────────────────────────────────────────────────────────
-// FUNCIÓN PRINCIPAL
-// ─────────────────────────────────────────────────────────────
-
-const generateGroqResponse = async (history, userMessage) => {
+// ── conversationId es el nuevo parámetro ──────────────────────
+const generateGroqResponse = async (history, userMessage, conversationId) => {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new Error('[Groq] GROQ_API_KEY no configurada');
 
@@ -186,7 +154,7 @@ const generateGroqResponse = async (history, userMessage) => {
 
   console.log('[Groq] Estado:', JSON.stringify(state));
 
-  // ── 1. Cita completa → confirmar y enviar email ──
+  // ── 1. Cita completa → confirmar, cerrar conversación y enviar email ──
   if (state.appointmentCompleted) {
     sendAppointmentEmails({
       name:  state.name,
@@ -194,6 +162,12 @@ const generateGroqResponse = async (history, userMessage) => {
       date:  state.date,
       time:  state.time,
     });
+
+    // ← Cierra la conversación para que el próximo mensaje empiece limpio
+    if (conversationId) {
+      await closeConversation(conversationId);
+    }
+
     return (
       `¡Perfecto, ${state.name}! 🙌 Cita confirmada para el ${state.date} a las ${state.time}. ` +
       `Te hemos enviado los detalles a ${state.email}. ¡Hasta entonces!`

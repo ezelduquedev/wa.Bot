@@ -156,7 +156,7 @@ const processIncomingMessage = async (message) => {
     try {
 
       console.log('\n[Groq] Generando respuesta IA...');
-      responseText = await generateGroqResponse(historyForGroq, text);
+      responseText = await generateGroqResponse(historyForGroq, text, conversation.id); // ← fix
       console.log('[Groq] ✅ Respuesta generada');
       console.log('[Groq] Texto:', responseText);
 
