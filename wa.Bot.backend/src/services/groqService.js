@@ -1,6 +1,7 @@
 // services/groqService.js
 
 const Groq = require('groq-sdk');
+const { sendAppointmentEmails } = require('./emailService');
 
 // ─────────────────────────────────────────────────────────────
 // SYSTEM PROMPT
@@ -237,9 +238,17 @@ const generateGroqResponse = async (history, userMessage) => {
 
   // ── Respuesta controlada cuando la cita está completa ──
   if (state.appointmentCompleted) {
+    // Envía emails sin bloquear la respuesta al usuario
+    sendAppointmentEmails({
+      name:  state.name,
+      email: state.email,
+      date:  state.date,
+      time:  state.time,
+    });
+
     return (
       `¡Perfecto, ${state.name}! 🙌 Cita confirmada para el ${state.date} a las ${state.time}. ` +
-      `Te enviaremos los detalles a ${state.email}. ¡Hasta entonces!`
+      `Te hemos enviado los detalles a ${state.email}. ¡Hasta entonces!`
     );
   }
 
