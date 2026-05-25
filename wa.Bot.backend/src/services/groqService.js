@@ -2,7 +2,7 @@
 
 const Groq = require('groq-sdk');
 const { sendAppointmentEmails } = require('./emailService');
-const { closeConversation } = require('./dbService'); // ← nuevo
+const { closeConversation } = require('./dbService');
 
 const SYSTEM_PROMPT = `
 Eres el asistente comercial de Ezel Dev, una agencia especializada en desarrollo web, apps, automatización y soluciones digitales para empresas.
@@ -48,13 +48,19 @@ Información de la empresa:
 Habla como una conversación real de WhatsApp. Nunca uses markdown.
 `.trim();
 
+// ─────────────────────────────────────────────────────────────
+// EXTRACTORES
+// ─────────────────────────────────────────────────────────────
+
 const extractEmail = (text) => {
   const m = text.match(/[^\s@]+@[^\s@]+\.[^\s@]+/);
   return m ? m[0].toLowerCase() : null;
 };
 
 const extractTime = (text) => {
-  const m = text.match(/(?:a\s+)?las?\s+(\d{1,2})(?::(\d{2}))?|(\d{1,2}):(\d{2})/i);
+  const m = text.match(
+    /(?:a\s+)?las?\s+(\d{1,2})(?::(\d{2}))?|(\d{1,2}):(\d{2})/i
+  );
   if (!m) return null;
   if (m[3] !== undefined) return `${m[3]}:${m[4]}`;
   return `${m[1]}:${m[2] || '00'}`;
@@ -68,23 +74,46 @@ const extractDate = (text) => {
   for (const d of days) {
     if (lower.includes(d)) return d;
   }
-  const dm = lower.match(/(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/);
+  const dm = lower.match(
+    /(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/
+  );
   if (dm) return dm[0];
   return null;
 };
 
+const NAME_BLACKLIST = new Set([
+  'hola','buenas','hello','hi','ok','okay','vale','sí','si','no',
+  'gracias','perfecto','claro','genial','bien','bueno','oye','oiga',
+  'disculpa','perdona','mañana','pasado','lunes','martes','miércoles',
+  'miercoles','jueves','viernes','sábado','sabado','domingo',
+]);
+
 const extractName = (text) => {
-  const explicit = text.match(/(?:me llamo|soy|mi nombre es)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){0,3})/i);
+  const explicit = text.match(
+    /(?:me llamo|soy|mi nombre es)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){0,3})/i
+  );
   if (explicit) return explicit[1].trim();
-  const withEmail = text.match(/^([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){0,3})\s*,/);
+
+  const withEmail = text.match(
+    /^([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){0,3})\s*,/
+  );
   if (withEmail) return withEmail[1].trim();
+
+  const trimmed = text.trim();
   const isCleanName =
-    /^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){0,3}$/.test(text.trim()) &&
-    !text.includes('@') &&
-    !/\d/.test(text);
-  if (isCleanName) return text.trim();
+    /^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){0,3}$/.test(trimmed) &&
+    !trimmed.includes('@') &&
+    !/\d/.test(trimmed) &&
+    trimmed.split(' ').length >= 2 &&
+    !trimmed.split(' ').some(w => NAME_BLACKLIST.has(w.toLowerCase()));
+
+  if (isCleanName) return trimmed;
   return null;
 };
+
+// ─────────────────────────────────────────────────────────────
+// DETECTOR DE ESTADO
+// ─────────────────────────────────────────────────────────────
 
 const detectConversationState = (history, userMessage) => {
   const userMessages = [
@@ -104,10 +133,14 @@ const detectConversationState = (history, userMessage) => {
   };
 
   for (const msg of userMessages) {
-    if (!state.email) state.email = extractEmail(msg);
-    if (!state.time)  state.time  = extractTime(msg);
-    if (!state.date)  state.date  = extractDate(msg);
-    if (!state.name)  state.name  = extractName(msg);
+    const foundEmail = extractEmail(msg);
+    if (foundEmail) state.email = foundEmail;
+
+    if (!state.time) state.time = extractTime(msg);
+    if (!state.date) state.date = extractDate(msg);
+
+    const foundName = extractName(msg);
+    if (foundName) state.name = foundName;
   }
 
   const fullText = userMessages.join(' ').toLowerCase();
@@ -136,6 +169,11 @@ const detectConversationState = (history, userMessage) => {
   return state;
 };
 
+// ─────────────────────────────────────────────────────────────
+// RESPUESTAS HARDCODEADAS PARA RECOGIDA DE DATOS
+// El modelo NO interviene aquí — cero alucinaciones
+// ─────────────────────────────────────────────────────────────
+
 const getCollectionResponse = (state) => {
   if (!state.name)  return '¿Cuál es tu nombre completo?';
   if (!state.email) return '¿Cuál es tu correo electrónico?';
@@ -144,7 +182,10 @@ const getCollectionResponse = (state) => {
   return null;
 };
 
-// ── conversationId es el nuevo parámetro ──────────────────────
+// ─────────────────────────────────────────────────────────────
+// FUNCIÓN PRINCIPAL
+// ─────────────────────────────────────────────────────────────
+
 const generateGroqResponse = async (history, userMessage, conversationId) => {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new Error('[Groq] GROQ_API_KEY no configurada');
@@ -163,7 +204,6 @@ const generateGroqResponse = async (history, userMessage, conversationId) => {
       time:  state.time,
     });
 
-    // ← Cierra la conversación para que el próximo mensaje empiece limpio
     if (conversationId) {
       await closeConversation(conversationId);
     }
