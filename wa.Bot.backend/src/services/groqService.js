@@ -31,16 +31,20 @@ Normas de conversación:
 Cuando saludes por primera vez, preséntate así (exactamente):
 "Hola, gracias por contactar con Ezel Dev 👋 Trabajamos en desarrollo web, apps móviles, chatbots, automatización y consultoría tecnológica. ¿En qué podemos ayudarte?"
 
-Cuando el cliente mencione un servicio concreto, responde con 1-2 frases explicando brevemente ese servicio y luego haz UNA pregunta relevante para entender mejor su necesidad. No vuelvas a preguntar en qué puedes ayudar si ya te han dicho lo que quieren.
+FLUJO OBLIGATORIO cuando el cliente mencione un servicio:
+1. Explica brevemente en 2-3 frases qué incluye ese servicio y para qué sirve.
+2. Haz UNA pregunta para entender mejor su necesidad concreta.
+3. NO pases a recoger nombre/email/fecha hasta que el cliente haya confirmado que quiere agendar una llamada (use palabras como "sí", "me interesa", "perfecto", "quiero agendar", "agenda", "cuándo", etc.).
 
 Cuando hables sobre servicios:
-- Webs: pregunta objetivo de la web y tipo de negocio.
-- Apps: pregunta para qué sería la app y plataformas.
-- Chatbots: pregunta qué quieren automatizar o qué canal usan (WhatsApp, web, etc).
-- Empresas: pregunta qué proceso quieren digitalizar.
+- Webs: menciona que incluye diseño, desarrollo y posicionamiento. Pregunta qué tipo de negocio tiene y cuál es el objetivo de la web.
+- Apps: menciona que trabajamos iOS y Android con tecnologías modernas. Pregunta para qué sería la app y qué problema resuelve.
+- Chatbots: menciona que automatizamos atención al cliente 24/7 por WhatsApp o web. Pregunta qué quieren automatizar.
+- Empresas/APIs: menciona que integramos sistemas y digitalizamos procesos. Pregunta qué proceso quieren mejorar.
 
-Cuando el cliente muestre interés claro, ofrécele agendar una llamada.
-NO pidas nombre, email, fecha ni hora — eso lo gestiona el sistema automáticamente.
+Cuando el cliente confirme que quiere agendar una llamada, responde con algo como:
+"¡Perfecto! Para coordinar la llamada necesito algunos datos."
+Y a partir de ahí el sistema recoge automáticamente nombre, email, fecha y hora.
 
 Cuando la cita ya esté confirmada y el cliente diga algo como "gracias" o se despida, responde brevemente con un mensaje de cierre amable sin ofrecer más ayuda ni hacer preguntas.
 
@@ -83,7 +87,7 @@ const NAME_BLACKLIST = new Set([
   'hola','buenas','hello','hi','ok','okay','vale','sí','si','no',
   'gracias','perfecto','claro','genial','bien','bueno','oye','oiga',
   'disculpa','perdona','mañana','pasado','lunes','martes','miércoles',
-  'miercoles','jueves','viernes','sábado','sabado','domingo'
+  'miercoles','jueves','viernes','sábado','sabado','domingo',
 ]);
 
 const extractName = (text) => {
@@ -106,7 +110,7 @@ const extractName = (text) => {
 const detectConversationState = (history, userMessage) => {
   const userMessages = [
     ...history.filter(h => h.role === 'USER').map(h => h.content),
-    userMessage
+    userMessage,
   ];
 
   const state = {
@@ -122,7 +126,7 @@ const detectConversationState = (history, userMessage) => {
 
   for (const msg of userMessages) {
     const foundEmail = extractEmail(msg);
-    if (foundEmail) state.email = foundEmail; // siempre sobreescribe con el último válido
+    if (foundEmail) state.email = foundEmail;
 
     const foundTime = extractTime(msg);
     if (foundTime) state.time = foundTime;
@@ -135,13 +139,20 @@ const detectConversationState = (history, userMessage) => {
   }
 
   const fullText = userMessages.join(' ').toLowerCase();
-  if (/\bapp\b|ios|android/.test(fullText))                            state.interestedService = 'apps';
-  else if (/web|p[aá]gina|tienda\s+online/.test(fullText))             state.interestedService = 'web';
-  else if (/\bbot\b|chatbot/.test(fullText))                           state.interestedService = 'chatbots';
-  else if (/empresa|api|automatizaci[oó]n|integraci[oó]n|facturas/.test(fullText)) state.interestedService = 'business';
+  if (/\bapp\b|ios|android/.test(fullText))                                         state.interestedService = 'apps';
+  else if (/web|p[aá]gina|tienda\s+online/.test(fullText))                          state.interestedService = 'web';
+  else if (/\bbot\b|chatbot/.test(fullText))                                        state.interestedService = 'chatbots';
+  else if (/empresa|api|automatizaci[oó]n|integraci[oó]n|facturas/.test(fullText))  state.interestedService = 'business';
 
-  const positiveWords = ['si','sí','vale','perfecto','me interesa','quiero','agendar','claro','ok','okay','genial'];
-  state.appointmentAccepted = positiveWords.some(w => userMessage.toLowerCase().includes(w));
+  // ✅ FIX: solo activar recogida cuando el cliente pide explícitamente agendar
+  const appointmentTriggers = ['agendar','agenda','llamada','cita','reservar','cuándo podemos','cuando podemos','me apunto','me interesa una llamada'];
+  const softPositive = ['sí','si','vale','perfecto','claro','ok','okay','genial','adelante'];
+  const hasAppointmentTrigger = appointmentTriggers.some(w => userMessage.toLowerCase().includes(w));
+  const hasSoftPositive = softPositive.some(w => userMessage.toLowerCase() === w || userMessage.toLowerCase().startsWith(w + ' ') || userMessage.toLowerCase().endsWith(' ' + w));
+  // Solo activar con positivo suave si hay historial suficiente (el bot ya ofreció la llamada)
+  const assistantOfferedCall = history.some(h => h.role === 'ASSISTANT' && /llamada|cita|agendar/i.test(h.content));
+  state.appointmentAccepted = hasAppointmentTrigger || (hasSoftPositive && assistantOfferedCall);
+
   state.isCollecting = state.appointmentAccepted || !!(state.name || state.email || state.date || state.time);
   if (state.name && state.email && state.date && state.time) state.appointmentCompleted = true;
 
@@ -187,7 +198,6 @@ const generateGroqResponse = async (history, userMessage, conversationId) => {
 
   // 3. CITA COMPLETA → email + cerrar conversación
   if (state.appointmentCompleted) {
-    // ✅ FIX: await para que el email se envíe antes de continuar
     await sendAppointmentEmails({
       name:  state.name,
       email: state.email,
