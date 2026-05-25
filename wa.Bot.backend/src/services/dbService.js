@@ -1,17 +1,11 @@
 // services/dbService.js
-
 const { PrismaClient } = require('@prisma/client');
-
 const prisma = new PrismaClient();
 
 const findOrCreateContact = async (phoneNumber) => {
-  let contact = await prisma.contact.findUnique({
-    where: { phoneNumber },
-  });
+  let contact = await prisma.contact.findUnique({ where: { phoneNumber } });
   if (!contact) {
-    contact = await prisma.contact.create({
-      data: { phoneNumber },
-    });
+    contact = await prisma.contact.create({ data: { phoneNumber } });
     console.log(`[DB] Nuevo contacto creado: ${phoneNumber}`);
   }
   return contact;
@@ -48,12 +42,16 @@ const saveMessage = async ({ conversationId, role, content, waMessageId, timesta
   });
 };
 
-const getConversationHistory = async (conversationId, limit = 10) => {
-  return prisma.message.findMany({
+const getConversationHistory = async (conversationId, limit = 20) => {
+  // ✅ FIX: desc + reverse para garantizar que siempre tenemos los N más recientes
+  // en orden cronológico correcto, evitando perder mensajes con el nombre/email
+  // cuando la conversación supera el límite.
+  const messages = await prisma.message.findMany({
     where: { conversationId },
-    orderBy: { timestamp: 'asc' },
+    orderBy: { timestamp: 'desc' },
     take: limit,
   });
+  return messages.reverse();
 };
 
 const getConversations = async () => {
@@ -93,7 +91,6 @@ const clearDatabase = async () => {
   console.log('[DB] ✅ Base de datos limpiada');
 };
 
-// ── NUEVO ──────────────────────────────────────────────────────
 const closeConversation = async (conversationId) => {
   await prisma.conversation.update({
     where: { id: conversationId },
@@ -101,7 +98,6 @@ const closeConversation = async (conversationId) => {
   });
   console.log(`[DB] Conversación cerrada: ${conversationId}`);
 };
-// ──────────────────────────────────────────────────────────────
 
 module.exports = {
   prisma,
@@ -112,5 +108,5 @@ module.exports = {
   getConversations,
   getMessages,
   clearDatabase,
-  closeConversation, // ← nuevo
+  closeConversation,
 };

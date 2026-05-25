@@ -1,7 +1,7 @@
 // services/groqService.js
 const Groq = require('groq-sdk');
 const { sendAppointmentEmails } = require('./emailService');
-const { closeConversation } = require('./dbService');
+const { closeConversation }     = require('./dbService');
 
 const SYSTEM_PROMPT = `
 Eres el asistente comercial de Ezel Dev, una agencia especializada en desarrollo web, apps, automatización y soluciones digitales para empresas.
@@ -34,7 +34,7 @@ Cuando saludes por primera vez, preséntate así (exactamente):
 FLUJO OBLIGATORIO cuando el cliente mencione un servicio:
 1. Explica brevemente en 2-3 frases qué incluye ese servicio y para qué sirve.
 2. Haz UNA pregunta para entender mejor su necesidad concreta.
-3. NO pases a recoger nombre/email/fecha hasta que el cliente haya confirmado que quiere agendar una llamada (use palabras como "sí", "me interesa", "perfecto", "quiero agendar", "agenda", "cuándo", etc.).
+3. NO pases a recoger nombre/email/fecha hasta que el cliente haya confirmado que quiere agendar una llamada.
 
 Cuando hables sobre servicios:
 - Webs: menciona que incluye diseño, desarrollo y posicionamiento. Pregunta qué tipo de negocio tiene y cuál es el objetivo de la web.
@@ -113,17 +113,20 @@ const detectConversationState = (history, userMessage) => {
     userMessage,
   ];
 
+  console.log('[Groq] 🔍 Mensajes USER para extracción:', JSON.stringify(userMessages));
+
   const state = {
-    interestedService: null,
-    appointmentAccepted: false,
-    isCollecting: false,
-    name: null,
-    email: null,
-    date: null,
-    time: null,
+    interestedService:    null,
+    appointmentAccepted:  false,
+    isCollecting:         false,
+    name:                 null,
+    email:                null,
+    date:                 null,
+    time:                 null,
     appointmentCompleted: false,
   };
 
+  // ✅ Recorre TODOS los mensajes de usuario acumulando siempre el último valor válido
   for (const msg of userMessages) {
     const foundEmail = extractEmail(msg);
     if (foundEmail) state.email = foundEmail;
@@ -138,21 +141,32 @@ const detectConversationState = (history, userMessage) => {
     if (foundName) state.name = foundName;
   }
 
+  console.log('[Groq] 🔍 Regex extrajo — name:', state.name, '| email:', state.email, '| date:', state.date, '| time:', state.time);
+
   const fullText = userMessages.join(' ').toLowerCase();
   if (/\bapp\b|ios|android/.test(fullText))                                         state.interestedService = 'apps';
   else if (/web|p[aá]gina|tienda\s+online/.test(fullText))                          state.interestedService = 'web';
   else if (/\bbot\b|chatbot/.test(fullText))                                        state.interestedService = 'chatbots';
   else if (/empresa|api|automatizaci[oó]n|integraci[oó]n|facturas/.test(fullText))  state.interestedService = 'business';
 
-  // ✅ FIX: solo activar recogida cuando el cliente pide explícitamente agendar
-  const appointmentTriggers = ['agendar','agenda','llamada','cita','reservar','cuándo podemos','cuando podemos','me apunto','me interesa una llamada'];
+  // ✅ appointmentAccepted solo si hay trigger explícito de cita,
+  // O positivo suave DESPUÉS de que el bot haya ofrecido la llamada
+  const appointmentTriggers = [
+    'agendar','agenda','llamada','cita','reservar',
+    'cuándo podemos','cuando podemos','me apunto','me interesa una llamada',
+  ];
   const softPositive = ['sí','si','vale','perfecto','claro','ok','okay','genial','adelante'];
-  const hasAppointmentTrigger = appointmentTriggers.some(w => userMessage.toLowerCase().includes(w));
-  const hasSoftPositive = softPositive.some(w => userMessage.toLowerCase() === w || userMessage.toLowerCase().startsWith(w + ' ') || userMessage.toLowerCase().endsWith(' ' + w));
-  // Solo activar con positivo suave si hay historial suficiente (el bot ya ofreció la llamada)
-  const assistantOfferedCall = history.some(h => h.role === 'ASSISTANT' && /llamada|cita|agendar/i.test(h.content));
-  state.appointmentAccepted = hasAppointmentTrigger || (hasSoftPositive && assistantOfferedCall);
 
+  const hasAppointmentTrigger = appointmentTriggers.some(w => userMessage.toLowerCase().includes(w));
+  const hasSoftPositive = softPositive.some(w => {
+    const msg = userMessage.toLowerCase().trim();
+    return msg === w || msg.startsWith(w + ' ') || msg.endsWith(' ' + w);
+  });
+  const assistantOfferedCall = history.some(
+    h => h.role === 'ASSISTANT' && /llamada|cita|agendar/i.test(h.content)
+  );
+
+  state.appointmentAccepted = hasAppointmentTrigger || (hasSoftPositive && assistantOfferedCall);
   state.isCollecting = state.appointmentAccepted || !!(state.name || state.email || state.date || state.time);
   if (state.name && state.email && state.date && state.time) state.appointmentCompleted = true;
 
@@ -173,10 +187,10 @@ const getCollectionResponse = (state) => {
 
 const generateGroqResponse = async (history, userMessage, conversationId) => {
   const apiKey = process.env.GROQ_API_KEY;
-  const groq = new Groq({ apiKey });
+  const groq   = new Groq({ apiKey });
 
-  // 1. EXTRACCIÓN CON IA
-  const extractionPrompt = `Extrae name, email, date, time del mensaje. Responde SOLO en JSON. Si no existe, pon null. Mensaje: "${userMessage}"`;
+  // 1. EXTRACCIÓN CON IA — solo del mensaje actual para complementar regex
+  const extractionPrompt = `Extrae name, email, date, time del mensaje. Responde SOLO en JSON válido. Si no existe un campo, pon null. Mensaje: "${userMessage}"`;
   const extraction = await groq.chat.completions.create({
     model: 'llama-3.3-70b-versatile',
     messages: [{ role: 'user', content: extractionPrompt }],
@@ -184,19 +198,23 @@ const generateGroqResponse = async (history, userMessage, conversationId) => {
     temperature: 0,
   });
   const aiExtracted = JSON.parse(extraction.choices[0].message.content);
+  console.log('[Groq] 🤖 IA extrajo del mensaje actual:', JSON.stringify(aiExtracted));
 
-  // 2. ESTADO CONSOLIDADO (regex + IA)
+  // 2. ESTADO CONSOLIDADO (regex sobre historial completo + IA sobre mensaje actual)
   const state = detectConversationState(history, userMessage);
-  state.name  = state.name  || aiExtracted.name;
-  state.email = state.email || aiExtracted.email;
-  state.date  = state.date  || aiExtracted.date;
-  state.time  = state.time  || aiExtracted.time;
+
+  // IA complementa lo que regex no encontró — nunca sobreescribe
+  if (!state.name  && aiExtracted.name)  state.name  = aiExtracted.name;
+  if (!state.email && aiExtracted.email) state.email = aiExtracted.email;
+  if (!state.date  && aiExtracted.date)  state.date  = aiExtracted.date;
+  if (!state.time  && aiExtracted.time)  state.time  = aiExtracted.time;
+
   state.isCollecting = !!(state.name || state.email || state.date || state.time || state.appointmentAccepted);
   if (state.name && state.email && state.date && state.time) state.appointmentCompleted = true;
 
-  console.log('[Groq] Estado Consolidado:', JSON.stringify(state));
+  console.log('[Groq] ✅ Estado final:', JSON.stringify(state));
 
-  // 3. CITA COMPLETA → email + cerrar conversación
+  // 3. CITA COMPLETA → enviar email y cerrar conversación
   if (state.appointmentCompleted) {
     await sendAppointmentEmails({
       name:  state.name,
@@ -219,11 +237,14 @@ const generateGroqResponse = async (history, userMessage, conversationId) => {
     model: 'llama-3.3-70b-versatile',
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
-      ...history.map(h => ({ role: h.role === 'USER' ? 'user' : 'assistant', content: h.content })),
+      ...history.map(h => ({
+        role:    h.role === 'USER' ? 'user' : 'assistant',
+        content: h.content,
+      })),
       { role: 'user', content: userMessage },
     ],
     temperature: 0.4,
-    max_tokens: 300,
+    max_tokens:  300,
   });
 
   return completion.choices[0].message.content.trim();

@@ -1,18 +1,16 @@
 // controllers/webhookController.js
-
 const crypto = require('crypto');
 
 const {
   findOrCreateContact,
   findOrCreateConversation,
   saveMessage,
-  getConversationHistory
+  getConversationHistory,
 } = require('../services/dbService');
 
 const { sendWhatsAppMessage } = require('../services/whatsappService');
 const { generateGroqResponse } = require('../services/groqService');
-const { buildStaticResponse } = require('../services/responseService');
-
+const { buildStaticResponse }  = require('../services/responseService');
 
 // ─────────────────────────────────────────────────────────────
 // 1. Verificación del Webhook (GET)
@@ -37,13 +35,11 @@ const verifyWebhook = (req, res) => {
   return res.sendStatus(403);
 };
 
-
 // ─────────────────────────────────────────────────────────────
 // 2. Recepción de Eventos (POST)
 // ─────────────────────────────────────────────────────────────
 
 const receiveMessage = async (req, res) => {
-
   console.log('\n==============================');
   console.log('[Webhook] POST recibido');
   console.log('==============================\n');
@@ -64,7 +60,6 @@ const receiveMessage = async (req, res) => {
   }
 
   try {
-
     const entry    = body.entry?.[0];
     const changes  = entry?.changes?.[0]?.value;
     const messages = changes?.messages;
@@ -87,22 +82,17 @@ const receiveMessage = async (req, res) => {
     await processIncomingMessage(message);
 
   } catch (error) {
-
     console.error('\n[Webhook] ❌ ERROR CRÍTICO');
     console.error(error);
-
   }
 };
-
 
 // ─────────────────────────────────────────────────────────────
 // 3. Procesamiento principal
 // ─────────────────────────────────────────────────────────────
 
 const processIncomingMessage = async (message) => {
-
   try {
-
     const phoneNumber = message.from;
     const text        = message.text.body;
     const waMessageId = message.id;
@@ -115,19 +105,19 @@ const processIncomingMessage = async (message) => {
     console.log('Texto:', text);
     console.log('WA Message ID:', waMessageId);
 
-    // ── CONTACTO ─────────────────────
+    // ── CONTACTO ─────────────────────────────────────────────
 
     console.log('\n[DB] Buscando/creando contacto...');
     const contact = await findOrCreateContact(phoneNumber);
     console.log('[DB] ✅ Contacto OK:', contact.id);
 
-    // ── CONVERSACIÓN ─────────────────
+    // ── CONVERSACIÓN ─────────────────────────────────────────
 
     console.log('\n[DB] Buscando/creando conversación...');
     const conversation = await findOrCreateConversation(contact.id);
     console.log('[DB] ✅ Conversación OK:', conversation.id);
 
-    // ── GUARDAR MENSAJE USER ─────────
+    // ── GUARDAR MENSAJE USER ──────────────────────────────────
 
     console.log('\n[DB] Guardando mensaje USER...');
     await saveMessage({
@@ -139,56 +129,54 @@ const processIncomingMessage = async (message) => {
     });
     console.log('[DB] ✅ Mensaje USER guardado');
 
-    // ── HISTORIAL ────────────────────
+    // ── HISTORIAL ─────────────────────────────────────────────
+    // ✅ FIX: subimos a 30 y el propio getConversationHistory ya devuelve
+    // los N más recientes en orden cronológico (desc+reverse en dbService).
+    // Excluimos solo el mensaje actual para no duplicarlo en el contexto de Groq.
 
     console.log('\n[DB] Obteniendo historial...');
-    const history = await getConversationHistory(conversation.id, 10);
-    console.log('[DB] Historial obtenido:', history.length);
+    const history = await getConversationHistory(conversation.id, 30);
+    console.log('[DB] Historial obtenido:', history.length, 'mensajes');
 
     const historyForGroq = history.filter(
       msg => msg.waMessageId !== waMessageId
     );
 
-    // ── GROQ ─────────────────────────
+    console.log('[DB] Historial para Groq:', historyForGroq.length, 'mensajes');
+    console.log('[DB] Roles en historial:', historyForGroq.map(m => `${m.role}: ${m.content.substring(0, 30)}`));
+
+    // ── GROQ ──────────────────────────────────────────────────
 
     let responseText;
 
     try {
-
       console.log('\n[Groq] Generando respuesta IA...');
-      responseText = await generateGroqResponse(historyForGroq, text, conversation.id); // ← fix
+      responseText = await generateGroqResponse(historyForGroq, text, conversation.id);
       console.log('[Groq] ✅ Respuesta generada');
       console.log('[Groq] Texto:', responseText);
 
     } catch (groqError) {
-
       console.error('\n[Groq] ❌ ERROR');
       console.error(groqError);
       console.log('[Groq] Usando fallback...');
       responseText = buildStaticResponse(text);
-
     }
 
-    // ── WHATSAPP SEND ────────────────
+    // ── WHATSAPP SEND ─────────────────────────────────────────
 
     console.log('\n[WhatsApp] Enviando respuesta...');
-
     let botWaMessageId = null;
 
     try {
-
       botWaMessageId = await sendWhatsAppMessage(phoneNumber, responseText);
-      console.log('[WhatsApp] ✅ Mensaje enviado');
-      console.log('[WhatsApp] Message ID:', botWaMessageId);
+      console.log('[WhatsApp] ✅ Mensaje enviado, ID:', botWaMessageId);
 
     } catch (whatsappError) {
-
       console.error('\n[WhatsApp] ❌ ERROR ENVÍO');
       console.error(whatsappError);
-
     }
 
-    // ── GUARDAR RESPUESTA BOT ────────
+    // ── GUARDAR RESPUESTA BOT ─────────────────────────────────
 
     console.log('\n[DB] Guardando mensaje ASSISTANT...');
     await saveMessage({
@@ -205,15 +193,12 @@ const processIncomingMessage = async (message) => {
     console.log('==============================\n');
 
   } catch (error) {
-
     console.error('\n[ProcessIncomingMessage] ❌ ERROR GENERAL');
     console.error(error);
-
   }
 };
 
-
 module.exports = {
   verifyWebhook,
-  receiveMessage
+  receiveMessage,
 };
