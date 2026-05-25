@@ -26,7 +26,6 @@ const buildEmailHTML = ({ name, date, time, email }) => `
               border-bottom:1px solid #ffffff0f;
               position:relative;
             ">
-              <!-- Accent line top -->
               <div style="
                 position:absolute;top:0;left:48px;right:48px;height:2px;
                 background:linear-gradient(90deg,#6366f1,#a855f7,#ec4899);
@@ -113,7 +112,6 @@ const buildEmailHTML = ({ name, date, time, email }) => `
                 border:1px solid #ffffff10;
                 overflow:hidden;
               ">
-                <!-- Fila: Nombre -->
                 <tr>
                   <td style="padding:20px 24px;border-bottom:1px solid #ffffff08;">
                     <table width="100%" cellpadding="0" cellspacing="0">
@@ -131,7 +129,6 @@ const buildEmailHTML = ({ name, date, time, email }) => `
                     </table>
                   </td>
                 </tr>
-                <!-- Fila: Fecha -->
                 <tr>
                   <td style="padding:20px 24px;border-bottom:1px solid #ffffff08;">
                     <table width="100%" cellpadding="0" cellspacing="0">
@@ -149,7 +146,6 @@ const buildEmailHTML = ({ name, date, time, email }) => `
                     </table>
                   </td>
                 </tr>
-                <!-- Fila: Hora -->
                 <tr>
                   <td style="padding:20px 24px;border-bottom:1px solid #ffffff08;">
                     <table width="100%" cellpadding="0" cellspacing="0">
@@ -167,7 +163,6 @@ const buildEmailHTML = ({ name, date, time, email }) => `
                     </table>
                   </td>
                 </tr>
-                <!-- Fila: Email -->
                 <tr>
                   <td style="padding:20px 24px;">
                     <table width="100%" cellpadding="0" cellspacing="0">
@@ -187,7 +182,6 @@ const buildEmailHTML = ({ name, date, time, email }) => `
                 </tr>
               </table>
 
-              <!-- Aviso -->
               <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:24px;">
                 <tr>
                   <td style="
@@ -270,17 +264,23 @@ const sendEmail = async ({ to, subject, html }) => {
 const sendAppointmentEmails = async ({ name, date, time, email }) => {
   const html = buildEmailHTML({ name, date, time, email });
 
+  // ─── TU EMAIL DE RESEND ───────────────────────────────────────
+  // Cuenta gratuita: solo puedes enviar al email con el que
+  // te registraste en resend.com. Ponlo aquí en las dos líneas.
+  const MY_RESEND_EMAIL = 'zenderdk@gmail.com'; // ← cambia esto
+  // ─────────────────────────────────────────────────────────────
+
   try {
     await Promise.all([
-      // Email al cliente
+      // Email al cliente (va a tu email porque Resend gratuito no permite otros destinos)
       sendEmail({
-        to:      email,
-        subject: `✅ Cita confirmada — ${date} a las ${time}h · Ezel Dev`,
+        to:      MY_RESEND_EMAIL, // ← cuando tengas dominio propio, cambia por: email
+        subject: `✅ Cita confirmada — ${name} (${email}) · ${date} a las ${time}h`,
         html,
       }),
       // Notificación interna
       sendEmail({
-        to:      process.env.EMAIL_INTERNAL,
+        to:      MY_RESEND_EMAIL, // ← cuando tengas dominio propio, añade EMAIL_INTERNAL
         subject: `📅 Nueva cita — ${name} · ${date} a las ${time}h`,
         html: `
           <body style="background:#0a0a0f;padding:32px;font-family:'Helvetica Neue',Arial,sans-serif;">
@@ -295,7 +295,7 @@ const sendAppointmentEmails = async ({ name, date, time, email }) => {
                   <span style="font-size:15px;color:#f3f4f6;">${name}</span>
                 </td></tr>
                 <tr><td style="padding:10px 0;border-bottom:1px solid #ffffff08;">
-                  <span style="font-size:12px;color:#a855f7;text-transform:uppercase;letter-spacing:1px;">Email</span><br/>
+                  <span style="font-size:12px;color:#a855f7;text-transform:uppercase;letter-spacing:1px;">Email cliente</span><br/>
                   <span style="font-size:15px;color:#f3f4f6;">${email}</span>
                 </td></tr>
                 <tr><td style="padding:10px 0;border-bottom:1px solid #ffffff08;">
@@ -313,7 +313,7 @@ const sendAppointmentEmails = async ({ name, date, time, email }) => {
       }),
     ]);
 
-    console.log(`[Email] Confirmación enviada a ${email}`);
+    console.log(`[Email] ✅ Emails enviados correctamente`);
   } catch (err) {
     console.error('[Email] Error al enviar:', err.message);
   }
