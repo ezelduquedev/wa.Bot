@@ -1,5 +1,3 @@
-// services/groqService.js
-
 const Groq = require('groq-sdk');
 const { sendAppointmentEmails } = require('./emailService');
 
@@ -14,7 +12,6 @@ Tu objetivo es:
 - Entender qué necesita el cliente.
 - Hacer preguntas útiles y naturales.
 - Guiar la conversación hacia agendar una llamada.
-- No repetir preguntas ya respondidas.
 - Hablar como una persona real por WhatsApp.
 
 Servicios disponibles:
@@ -30,12 +27,7 @@ Normas de conversación:
 - Usa un tono cercano y profesional.
 - Usa emojis solo ocasionalmente.
 - Nunca uses markdown.
-- Nunca hagas demasiadas preguntas a la vez. Una pregunta por mensaje.
-- Si el usuario ya mostró interés en un servicio, profundiza en ese servicio.
-- Si el usuario acepta una llamada, NO vuelvas a preguntar qué necesita.
-- Si el usuario acepta una llamada, pide directamente nombre, email y disponibilidad horaria, DE UNO EN UNO.
-- Si ya tienes nombre, email, fecha y hora: confirma la cita y TERMINA el flujo.
-- Nunca vuelvas a ofrecer una llamada si ya está confirmada.
+- Una pregunta por mensaje.
 - No inventes precios ni plazos.
 - Si no sabes algo, indica que un agente continuará la conversación.
 
@@ -44,6 +36,9 @@ Cuando hables sobre servicios:
 - Apps: pregunta para qué sería la app y plataformas.
 - Chatbots: pregunta qué quieren automatizar.
 - Empresas: pregunta qué proceso quieren digitalizar.
+
+Cuando el cliente muestre interés claro, ofrécele agendar una llamada.
+NO pidas nombre, email, fecha ni hora — eso lo gestiona el sistema automáticamente.
 
 Información de la empresa:
 - Horario: lunes a viernes de 9:00 a 18:00
@@ -55,7 +50,7 @@ Habla como una conversación real de WhatsApp. Nunca uses markdown.
 `.trim();
 
 // ─────────────────────────────────────────────────────────────
-// EXTRACTORES — devuelven el valor real, no solo un booleano
+// EXTRACTORES
 // ─────────────────────────────────────────────────────────────
 
 const extractEmail = (text) => {
@@ -76,50 +71,40 @@ const extractDate = (text) => {
   const lower = text.toLowerCase();
   if (/pasado\s+ma[ñn]ana/.test(lower)) return 'pasado mañana';
   if (/ma[ñn]ana/.test(lower)) return 'mañana';
-
-  const days = [
-    'lunes', 'martes', 'miércoles', 'miercoles',
-    'jueves', 'viernes', 'sábado', 'sabado', 'domingo',
-  ];
+  const days = ['lunes','martes','miércoles','miercoles','jueves','viernes','sábado','sabado','domingo'];
   for (const d of days) {
     if (lower.includes(d)) return d;
   }
-
   const dm = lower.match(
     /(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/
   );
   if (dm) return dm[0];
-
   return null;
 };
 
 const extractName = (text) => {
-  // Prefijos explícitos: "me llamo X", "soy X", "mi nombre es X"
   const explicit = text.match(
     /(?:me llamo|soy|mi nombre es)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){0,3})/i
   );
   if (explicit) return explicit[1].trim();
 
-  // "Nombre Apellido, email" todo junto
   const withEmail = text.match(
     /^([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){0,3})\s*,/
   );
   if (withEmail) return withEmail[1].trim();
 
-  // Nombre solo: 1-4 palabras capitalizadas, sin email ni números
-  // Cubre el caso más común: el bot pregunta el nombre y el usuario responde "Ezel Alexander"
+  // Nombre solo: palabras capitalizadas, sin email ni números
   const isCleanName =
     /^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){0,3}$/.test(text.trim()) &&
     !text.includes('@') &&
     !/\d/.test(text);
 
   if (isCleanName) return text.trim();
-
   return null;
 };
 
 // ─────────────────────────────────────────────────────────────
-// DETECTOR DE ESTADO — escanea solo mensajes del usuario
+// DETECTOR DE ESTADO
 // ─────────────────────────────────────────────────────────────
 
 const detectConversationState = (history, userMessage) => {
@@ -131,6 +116,7 @@ const detectConversationState = (history, userMessage) => {
   const state = {
     interestedService: null,
     appointmentAccepted: false,
+    isCollecting: false,
     name: null,
     email: null,
     date: null,
@@ -157,13 +143,15 @@ const detectConversationState = (history, userMessage) => {
     state.interestedService = 'business';
   }
 
-  const positiveWords = [
-    'si', 'sí', 'vale', 'perfecto', 'me interesa',
-    'quiero', 'agendar', 'claro', 'ok', 'okay', 'genial',
-  ];
-  state.appointmentAccepted = positiveWords.some(w =>
-    userMessage.toLowerCase().includes(w)
-  );
+  // Detectar si el usuario aceptó la llamada en CUALQUIER momento del historial
+  const positiveWords = ['si','sí','vale','perfecto','me interesa','quiero','agendar','claro','ok','okay','genial'];
+  const allUserText = userMessages.join(' ').toLowerCase();
+  state.appointmentAccepted = positiveWords.some(w => userMessage.toLowerCase().includes(w));
+
+  // isCollecting: el usuario aceptó en algún momento O ya tenemos algún dato de cita
+  state.isCollecting =
+    state.appointmentAccepted ||
+    !!(state.name || state.email || state.date || state.time);
 
   if (state.name && state.email && state.date && state.time) {
     state.appointmentCompleted = true;
@@ -173,42 +161,16 @@ const detectConversationState = (history, userMessage) => {
 };
 
 // ─────────────────────────────────────────────────────────────
-// PROMPT DE ESTADO — le dice al modelo exactamente qué falta
+// RESPUESTAS HARDCODEADAS PARA RECOGIDA DE DATOS
+// El modelo NO interviene aquí — cero alucinaciones
 // ─────────────────────────────────────────────────────────────
 
-const buildStatePrompt = (state) => {
-  const collected = [];
-  const missing   = [];
-
-  if (state.name)  collected.push(`nombre: "${state.name}"`);
-  else             missing.push('nombre');
-
-  if (state.email) collected.push(`email: "${state.email}"`);
-  else             missing.push('email');
-
-  if (state.date)  collected.push(`fecha: "${state.date}"`);
-  else             missing.push('fecha');
-
-  if (state.time)  collected.push(`hora: "${state.time}"`);
-  else             missing.push('hora');
-
-  const lines = [];
-
-  if (collected.length) {
-    lines.push(`Datos ya recogidos → ${collected.join(' | ')}`);
-    lines.push('NO vuelvas a preguntar por estos datos.');
-  }
-
-  if (missing.length) {
-    lines.push(`Datos que faltan → ${missing.join(', ')}`);
-    lines.push('Pide SOLO el primero de la lista. Una pregunta por mensaje.');
-  }
-
-  if (state.interestedService) {
-    lines.push(`Servicio de interés: ${state.interestedService}`);
-  }
-
-  return lines.join('\n');
+const getCollectionResponse = (state) => {
+  if (!state.name)  return '¿Cuál es tu nombre completo?';
+  if (!state.email) return '¿Cuál es tu correo electrónico?';
+  if (!state.date)  return '¿Qué día te viene bien para la llamada?';
+  if (!state.time)  return '¿A qué hora te llamo?';
+  return null;
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -222,8 +184,9 @@ const generateGroqResponse = async (history, userMessage) => {
   const groq = new Groq({ apiKey });
   const state = detectConversationState(history, userMessage);
 
-  console.log('[Groq] Estado detectado:', JSON.stringify(state));
+  console.log('[Groq] Estado:', JSON.stringify(state));
 
+  // ── 1. Cita completa → confirmar y enviar email ──
   if (state.appointmentCompleted) {
     sendAppointmentEmails({
       name:  state.name,
@@ -231,13 +194,19 @@ const generateGroqResponse = async (history, userMessage) => {
       date:  state.date,
       time:  state.time,
     });
-
     return (
       `¡Perfecto, ${state.name}! 🙌 Cita confirmada para el ${state.date} a las ${state.time}. ` +
       `Te hemos enviado los detalles a ${state.email}. ¡Hasta entonces!`
     );
   }
 
+  // ── 2. Recogiendo datos → respuesta hardcodeada, sin LLM ──
+  if (state.isCollecting) {
+    const next = getCollectionResponse(state);
+    if (next) return next;
+  }
+
+  // ── 3. Conversación libre → LLM ──
   const formattedHistory = history.map(msg => ({
     role:    msg.role === 'USER' ? 'user' : 'assistant',
     content: msg.content,
@@ -245,7 +214,6 @@ const generateGroqResponse = async (history, userMessage) => {
 
   const messages = [
     { role: 'system', content: SYSTEM_PROMPT },
-    { role: 'system', content: buildStatePrompt(state) },
     ...formattedHistory,
     { role: 'user', content: userMessage },
   ];
@@ -253,15 +221,14 @@ const generateGroqResponse = async (history, userMessage) => {
   const completion = await groq.chat.completions.create({
     model:       'llama-3.3-70b-versatile',
     messages,
-    temperature: 0.3,
+    temperature: 0.4,
     max_tokens:  300,
   });
 
   const responseText = completion.choices?.[0]?.message?.content?.trim();
   if (!responseText) throw new Error('[Groq] Respuesta vacía');
 
-  console.log(`[Groq] Respuesta generada (${responseText.length} chars)`);
-
+  console.log(`[Groq] Respuesta LLM (${responseText.length} chars)`);
   return responseText;
 };
 
