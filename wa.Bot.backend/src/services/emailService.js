@@ -117,12 +117,8 @@ const buildEmailHTML = ({ name, date, time, email }) => `
                     <table width="100%" cellpadding="0" cellspacing="0">
                       <tr>
                         <td>
-                          <p style="margin:0;font-family:'Helvetica Neue',Arial,sans-serif;font-size:10px;color:#6366f1;text-transform:uppercase;letter-spacing:2px;font-weight:600;">
-                            Contacto
-                          </p>
-                          <p style="margin:6px 0 0;font-family:'Helvetica Neue',Arial,sans-serif;font-size:15px;color:#f3f4f6;font-weight:500;">
-                            ${name}
-                          </p>
+                          <p style="margin:0;font-family:'Helvetica Neue',Arial,sans-serif;font-size:10px;color:#6366f1;text-transform:uppercase;letter-spacing:2px;font-weight:600;">Contacto</p>
+                          <p style="margin:6px 0 0;font-family:'Helvetica Neue',Arial,sans-serif;font-size:15px;color:#f3f4f6;font-weight:500;">${name}</p>
                         </td>
                         <td align="right" style="font-size:20px;">👤</td>
                       </tr>
@@ -134,12 +130,8 @@ const buildEmailHTML = ({ name, date, time, email }) => `
                     <table width="100%" cellpadding="0" cellspacing="0">
                       <tr>
                         <td>
-                          <p style="margin:0;font-family:'Helvetica Neue',Arial,sans-serif;font-size:10px;color:#a855f7;text-transform:uppercase;letter-spacing:2px;font-weight:600;">
-                            Fecha
-                          </p>
-                          <p style="margin:6px 0 0;font-family:'Helvetica Neue',Arial,sans-serif;font-size:15px;color:#f3f4f6;font-weight:500;text-transform:capitalize;">
-                            ${date}
-                          </p>
+                          <p style="margin:0;font-family:'Helvetica Neue',Arial,sans-serif;font-size:10px;color:#a855f7;text-transform:uppercase;letter-spacing:2px;font-weight:600;">Fecha</p>
+                          <p style="margin:6px 0 0;font-family:'Helvetica Neue',Arial,sans-serif;font-size:15px;color:#f3f4f6;font-weight:500;text-transform:capitalize;">${date}</p>
                         </td>
                         <td align="right" style="font-size:20px;">📅</td>
                       </tr>
@@ -151,12 +143,8 @@ const buildEmailHTML = ({ name, date, time, email }) => `
                     <table width="100%" cellpadding="0" cellspacing="0">
                       <tr>
                         <td>
-                          <p style="margin:0;font-family:'Helvetica Neue',Arial,sans-serif;font-size:10px;color:#ec4899;text-transform:uppercase;letter-spacing:2px;font-weight:600;">
-                            Hora
-                          </p>
-                          <p style="margin:6px 0 0;font-family:'Helvetica Neue',Arial,sans-serif;font-size:15px;color:#f3f4f6;font-weight:500;">
-                            ${time}:00 h
-                          </p>
+                          <p style="margin:0;font-family:'Helvetica Neue',Arial,sans-serif;font-size:10px;color:#ec4899;text-transform:uppercase;letter-spacing:2px;font-weight:600;">Hora</p>
+                          <p style="margin:6px 0 0;font-family:'Helvetica Neue',Arial,sans-serif;font-size:15px;color:#f3f4f6;font-weight:500;">${time}:00 h</p>
                         </td>
                         <td align="right" style="font-size:20px;">⏰</td>
                       </tr>
@@ -168,12 +156,8 @@ const buildEmailHTML = ({ name, date, time, email }) => `
                     <table width="100%" cellpadding="0" cellspacing="0">
                       <tr>
                         <td>
-                          <p style="margin:0;font-family:'Helvetica Neue',Arial,sans-serif;font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:2px;font-weight:600;">
-                            Email
-                          </p>
-                          <p style="margin:6px 0 0;font-family:'Helvetica Neue',Arial,sans-serif;font-size:15px;color:#f3f4f6;font-weight:500;">
-                            ${email}
-                          </p>
+                          <p style="margin:0;font-family:'Helvetica Neue',Arial,sans-serif;font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:2px;font-weight:600;">Email</p>
+                          <p style="margin:6px 0 0;font-family:'Helvetica Neue',Arial,sans-serif;font-size:15px;color:#f3f4f6;font-weight:500;">${email}</p>
                         </td>
                         <td align="right" style="font-size:20px;">✉️</td>
                       </tr>
@@ -239,23 +223,23 @@ const buildEmailHTML = ({ name, date, time, email }) => `
 `;
 
 const sendEmail = async ({ to, subject, html }) => {
-  const res = await fetch('https://api.resend.com/emails', {
+  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+      'api-key': process.env.BREVO_API_KEY,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: 'Ezel Dev <onboarding@resend.dev>',
-      to,
+      sender: { name: 'Ezel Dev', email: 'zenderdk@gmail.com' },
+      to: [{ email: to }],
       subject,
-      html,
+      htmlContent: html,
     }),
   });
 
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`[Resend] Error ${res.status}: ${err}`);
+    throw new Error(`[Brevo] Error ${res.status}: ${err}`);
   }
 
   return res.json();
@@ -264,23 +248,17 @@ const sendEmail = async ({ to, subject, html }) => {
 const sendAppointmentEmails = async ({ name, date, time, email }) => {
   const html = buildEmailHTML({ name, date, time, email });
 
-  // ─── TU EMAIL DE RESEND ───────────────────────────────────────
-  // Cuenta gratuita: solo puedes enviar al email con el que
-  // te registraste en resend.com. Ponlo aquí en las dos líneas.
-  const MY_RESEND_EMAIL = 'zenderdk@gmail.com'; // ← cambia esto
-  // ─────────────────────────────────────────────────────────────
-
   try {
     await Promise.all([
-      // Email al cliente (va a tu email porque Resend gratuito no permite otros destinos)
+      // Email de confirmación al cliente
       sendEmail({
-        to:      MY_RESEND_EMAIL, // ← cuando tengas dominio propio, cambia por: email
-        subject: `✅ Cita confirmada — ${name} (${email}) · ${date} a las ${time}h`,
+        to:      email,
+        subject: `✅ Cita confirmada — ${date} a las ${time}h · Ezel Dev`,
         html,
       }),
       // Notificación interna
       sendEmail({
-        to:      MY_RESEND_EMAIL, // ← cuando tengas dominio propio, añade EMAIL_INTERNAL
+        to:      'zenderdk@gmail.com',
         subject: `📅 Nueva cita — ${name} · ${date} a las ${time}h`,
         html: `
           <body style="background:#0a0a0f;padding:32px;font-family:'Helvetica Neue',Arial,sans-serif;">
@@ -313,7 +291,7 @@ const sendAppointmentEmails = async ({ name, date, time, email }) => {
       }),
     ]);
 
-    console.log(`[Email] ✅ Emails enviados correctamente`);
+    console.log(`[Email] ✅ Emails enviados — cliente: ${email}`);
   } catch (err) {
     console.error('[Email] Error al enviar:', err.message);
   }
