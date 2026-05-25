@@ -90,18 +90,18 @@ const NAME_BLACKLIST = new Set([
 
 const extractName = (text) => {
   const explicit = text.match(
-    /(?:me llamo|soy|mi nombre es)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){0,3})/i
+    /(?:me llamo|soy|mi nombre es)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñA-Za-z]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñA-Za-z]+){0,3})/i
   );
   if (explicit) return explicit[1].trim();
 
   const withEmail = text.match(
-    /^([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){0,3})\s*,/
+    /^([A-ZÁÉÍÓÚÑ][a-záéíóúñA-Za-z]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñA-Za-z]+){0,3})\s*,/
   );
   if (withEmail) return withEmail[1].trim();
 
   const trimmed = text.trim();
   const isCleanName =
-    /^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){0,3}$/.test(trimmed) &&
+    /^[A-ZÁÉÍÓÚÑ][a-záéíóúñA-Za-z]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñA-Za-z]+){0,3}$/.test(trimmed) &&
     !trimmed.includes('@') &&
     !/\d/.test(trimmed) &&
     trimmed.split(' ').length >= 2 &&
