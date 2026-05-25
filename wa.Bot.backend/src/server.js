@@ -7,7 +7,12 @@ require('dotenv').config({
 const express = require('express');
 const cors = require('cors');
 
+const {
+  clearDatabase
+} = require('./services/dbService');
+
 const app = express();
+
 const PORT = process.env.PORT || 3000;
 
 // ─────────────────────────────────────────────────────────────
@@ -22,7 +27,9 @@ app.use(express.json({
   }
 }));
 
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({
+  extended: true
+}));
 
 // ─────────────────────────────────────────────────────────────
 // Middleware Seguridad Admin
@@ -32,52 +39,78 @@ const adminAuth = (req, res, next) => {
 
   const key = req.headers['x-admin-key'];
 
-  if (key && key === process.env.ADMIN_SECRET_KEY) {
+  if (
+    key &&
+    key === process.env.ADMIN_SECRET_KEY
+  ) {
     return next();
   }
 
   return res.status(403).json({
+    success: false,
     error: 'Acceso denegado'
   });
+
 };
 
 // ─────────────────────────────────────────────────────────────
-// Importaciones
+// Importaciones rutas
 // ─────────────────────────────────────────────────────────────
 
-const webhookRoutes = require('./routes/webhook');
+const webhookRoutes =
+  require('./routes/webhook');
 
-const conversationRoutes = require('./routes/conversations');
-const contactsRoutes = require('./routes/contacts');
-const campaignRoutes = require('./routes/campaigns');
+const conversationRoutes =
+  require('./routes/conversations');
+
+const contactsRoutes =
+  require('./routes/contacts');
+
+const campaignRoutes =
+  require('./routes/campaigns');
+
+// ─────────────────────────────────────────────────────────────
+// Ruta principal
+// ─────────────────────────────────────────────────────────────
+
+app.get('/', (req, res) => {
+
+  return res.json({
+
+    status: 'ok',
+
+    project: 'WA.Bot',
+
+    environment:
+      process.env.NODE_ENV || 'development',
+  });
+
+});
 
 // ─────────────────────────────────────────────────────────────
 // Health checks
 // ─────────────────────────────────────────────────────────────
 
-app.get('/', (req, res) => {
-  res.json({
-    status: 'ok',
-    project: 'WA.Bot'
-  });
-});
-
 app.get('/health/db', (req, res) => {
-  res.json({
+
+  return res.json({
     status: 'ok'
   });
+
 });
 
 app.get('/health/whatsapp', (req, res) => {
-  res.json({
+
+  return res.json({
     status: 'ok'
   });
+
 });
 
 // ─────────────────────────────────────────────────────────────
 // Webhook WhatsApp
 // IMPORTANTE:
-// Solo dejamos UNA definición del webhook
+// Solo existe UNA definición
 // ─────────────────────────────────────────────────────────────
 
 app.use('/webhook', webhookRoutes);
@@ -88,89 +121,189 @@ app.use('/webhook', webhookRoutes);
 
 app.get('/webhook-test', (req, res) => {
 
-  const mode = req.query['hub.mode'];
-  const token = req.query['hub.verify_token'];
-  const challenge = req.query['hub.challenge'];
+  const mode =
+    req.query['hub.mode'];
 
-  console.log('[Webhook-Test] Query:', req.query);
+  const token =
+    req.query['hub.verify_token'];
+
+  const challenge =
+    req.query['hub.challenge'];
+
+  console.log(
+    '[Webhook-Test] Query:',
+    req.query
+  );
 
   if (
     mode === 'subscribe' &&
     token === process.env.VERIFY_TOKEN
   ) {
-    console.log('[Webhook-Test] ✅ Verificación correcta');
 
-    return res.status(200).send(challenge);
+    console.log(
+      '[Webhook-Test] ✅ Verificación correcta'
+    );
+
+    return res
+      .status(200)
+      .send(challenge);
   }
 
-  console.log('[Webhook-Test] ❌ Verificación fallida');
+  console.log(
+    '[Webhook-Test] ❌ Verificación fallida'
+  );
 
   return res.sendStatus(403);
+
 });
 
 // ─────────────────────────────────────────────────────────────
 // APIs
 // ─────────────────────────────────────────────────────────────
 
-app.use('/api/conversations', conversationRoutes);
+app.use(
+  '/api/conversations',
+  conversationRoutes
+);
 
-app.use('/api/contacts', contactsRoutes);
+app.use(
+  '/api/contacts',
+  contactsRoutes
+);
 
-app.use('/api/campaigns', campaignRoutes);
+app.use(
+  '/api/campaigns',
+  campaignRoutes
+);
 
 // ─────────────────────────────────────────────────────────────
 // Admin
 // ─────────────────────────────────────────────────────────────
 
-// ⚠️ Ahora mismo es solo respuesta fake.
-// No reinicia realmente el servicio.
+// ⚠️ En Vercel no existe reinicio manual real
 
-app.post('/api/admin/restart', adminAuth, async (req, res) => {
+app.post(
+  '/api/admin/restart',
+  adminAuth,
+  async (req, res) => {
 
-  try {
+    try {
 
-    console.log('[Admin] Solicitud reinicio');
+      console.log(
+        '[Admin] Solicitud reinicio'
+      );
 
-    return res.json({
-      success: true,
-      message: 'Servicio reiniciado'
-    });
+      return res.json({
 
-  } catch (error) {
+        success: true,
 
-    console.error(error);
+        message:
+          'En Vercel el servicio se reinicia automáticamente en cada deploy.',
 
-    return res.status(500).json({
-      success: false,
-      error: 'Error reiniciando servicio'
-    });
+      });
+
+    } catch (error) {
+
+      console.error(error);
+
+      return res.status(500).json({
+
+        success: false,
+
+        error:
+          'Error procesando reinicio',
+
+      });
+
+    }
+
   }
+);
+
+// ─────────────────────────────────────────────────────────────
+// Limpiar Base de Datos REAL
+// PostgreSQL + Prisma
+// ─────────────────────────────────────────────────────────────
+
+app.post(
+  '/api/admin/clear-db',
+  adminAuth,
+  async (req, res) => {
+
+    try {
+
+      console.log(
+        '[Admin] Limpiando base de datos...'
+      );
+
+      await clearDatabase();
+
+      return res.json({
+
+        success: true,
+
+        message:
+          'Base de datos limpiada correctamente',
+
+      });
+
+    } catch (error) {
+
+      console.error(
+        '[Admin] Error limpiando DB'
+      );
+
+      console.error(error);
+
+      return res.status(500).json({
+
+        success: false,
+
+        error:
+          'Error limpiando base de datos',
+
+      });
+
+    }
+
+  }
+);
+
+// ─────────────────────────────────────────────────────────────
+// 404 handler
+// ─────────────────────────────────────────────────────────────
+
+app.use((req, res) => {
+
+  return res.status(404).json({
+
+    success: false,
+
+    error: 'Ruta no encontrada',
+
+  });
 
 });
 
-// ⚠️ Ahora mismo es solo respuesta fake.
-// No limpia DB realmente.
+// ─────────────────────────────────────────────────────────────
+// Error handler global
+// ─────────────────────────────────────────────────────────────
 
-app.post('/api/admin/clear-db', adminAuth, async (req, res) => {
+app.use((err, req, res, next) => {
 
-  try {
+  console.error(
+    '[Server] Error global'
+  );
 
-    console.log('[Admin] Solicitud limpiar DB');
+  console.error(err);
 
-    return res.json({
-      success: true,
-      message: 'Base de datos limpiada'
-    });
+  return res.status(500).json({
 
-  } catch (error) {
+    success: false,
 
-    console.error(error);
+    error: 'Error interno servidor',
 
-    return res.status(500).json({
-      success: false,
-      error: 'Error limpiando base de datos'
-    });
-  }
+  });
 
 });
 
@@ -180,6 +313,8 @@ app.post('/api/admin/clear-db', adminAuth, async (req, res) => {
 
 app.listen(PORT, () => {
 
-  console.log(`[Server] WA.Bot corriendo en puerto ${PORT}`);
+  console.log(
+    `[Server] WA.Bot corriendo en puerto ${PORT}`
+  );
 
 });
