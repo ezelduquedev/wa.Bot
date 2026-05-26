@@ -178,3 +178,132 @@ html, body {
   color: #94a3b8;
   font-size: 15px;
 }
+
+/* ==========================================================================
+   RESPONSIVE — Mobile & Tablet
+   ========================================================================== */
+
+/* --- Hamburger button (hidden on desktop) --- */
+.menu-toggle {
+  display: none;
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 200;
+  background: var(--green-dark);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  width: 40px;
+  height: 40px;
+  font-size: 20px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+/* --- Overlay when sidebar is open on mobile --- */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  z-index: 90;
+}
+.sidebar-overlay.visible { display: block; }
+
+@media (max-width: 768px) {
+
+  /* Show hamburger */
+  .menu-toggle { display: flex; }
+
+  /* Sidebar becomes a slide-in drawer */
+  .sidebar {
+    position: fixed;
+    top: 0; left: 0;
+    height: 100vh;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    z-index: 100;
+    box-shadow: 4px 0 20px rgba(0,0,0,0.12);
+  }
+  .sidebar.open { transform: translateX(0); }
+
+  /* Main content takes full width */
+  .main-content {
+    padding: 72px 16px 24px;
+    width: 100%;
+  }
+
+  /* Dashboard grid: 1 column on mobile */
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+
+  /* Two col grid: stack vertically */
+  .two-col-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  /* Stat card value slightly smaller */
+  .stat-card-value { font-size: 32px; }
+
+  /* Contacts table: scroll horizontally */
+  .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .data-table { min-width: 540px; }
+
+  /* ---- Chat / Conversations ---- */
+  .chat-container {
+    flex-direction: column;
+    height: calc(100vh - 72px);
+    border-radius: 8px;
+  }
+
+  /* Show only the list OR the chat panel, controlled by a class */
+  .chat-sidebar {
+    width: 100%;
+    min-width: 0;
+    border-right: none;
+    border-bottom: 1px solid #e5e7eb;
+    height: 240px;
+    min-height: 240px;
+    flex-shrink: 0;
+  }
+
+  /* When a conversation is selected, collapse the list */
+  .chat-sidebar.hidden { display: none; }
+  .chat-main.hidden   { display: none; }
+
+  /* Back button inside chat header on mobile */
+  .back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-right: 12px;
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    color: var(--text-muted);
+    padding: 0;
+  }
+}
+
+/* --- Tablet (768–1024px): 2-col dashboard, narrower sidebar --- */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .sidebar { width: 200px; min-width: 200px; }
+  .main-content { padding: 24px 20px; }
+  .dashboard-grid { grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .two-col-grid { grid-template-columns: 1fr; gap: 14px; }
+  .chat-sidebar { width: 280px; min-width: 280px; }
+}
+
+/* On desktop: never hide chat-main (the .hidden class only applies ≤768px) */
+@media (min-width: 769px) {
+  .chat-sidebar.hidden { display: flex !important; }
+  .chat-main.hidden    { display: flex !important; }
+}

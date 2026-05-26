@@ -1,20 +1,49 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { useState, useEffect } from 'react';
 
 const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: '📊' },
-  { href: '/conversations', label: 'Conversaciones', icon: '💬' },
-  { href: '/campaigns', label: 'Campañas', icon: '📢' },
-  { href: '/contacts', label: 'Contactos', icon: '👥' },
-  { href: '/settings', label: 'Ajustes', icon: '⚙️' },
+  { href: '/dashboard',     label: 'Dashboard',       icon: '📊' },
+  { href: '/conversations', label: 'Conversaciones',  icon: '💬' },
+  { href: '/campaigns',     label: 'Campañas',        icon: '📢' },
+  { href: '/contacts',      label: 'Contactos',       icon: '👥' },
+  { href: '/settings',      label: 'Ajustes',         icon: '⚙️' },
 ];
 
 export default function Layout({ children }) {
   const router = useRouter();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Close sidebar on route change
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [router.pathname]);
+
+  // Close sidebar on Escape key
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') setSidebarOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   return (
     <div className="layout-container">
-      <aside className="sidebar">
+      {/* Hamburger button — only visible on mobile via CSS */}
+      <button
+        className="menu-toggle"
+        onClick={() => setSidebarOpen(o => !o)}
+        aria-label="Abrir menú"
+      >
+        {sidebarOpen ? '✕' : '☰'}
+      </button>
+
+      {/* Overlay (mobile only) */}
+      <div
+        className={`sidebar-overlay${sidebarOpen ? ' visible' : ''}`}
+        onClick={() => setSidebarOpen(false)}
+      />
+
+      <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
         <div style={{ padding: '32px 20px 24px 20px', borderBottom: '1px solid var(--sidebar-border)' }}>
           <h2 style={{ color: 'var(--green-dark)', fontSize: '22px' }}>WA.Bot</h2>
           <p style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600, marginTop: 4 }}>DESARROLLADO POR EZEL</p>
