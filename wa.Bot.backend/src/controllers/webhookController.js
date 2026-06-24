@@ -17,16 +17,30 @@ const { buildStaticResponse }  = require('../services/responseService');
 // ─────────────────────────────────────────────────────────────
 
 const verifyWebhook = (req, res) => {
+  console.log('\n==============================');
   console.log('[Webhook] Verificación GET recibida');
+  console.log('==============================');
 
-  const mode      = req.query['hub.mode'];
-  const token     = req.query['hub.verify_token'];
+  console.log('[Webhook] URL:', req.originalUrl);
+  console.log('[Webhook] Query:', req.query);
+
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
+
+  // Ignorar peticiones GET vacías
+  if (!mode && !token) {
+    console.log('[Webhook] ℹ️ GET sin parámetros (ignorado)');
+    return res.status(200).send('Webhook OK');
+  }
 
   console.log('[Webhook] mode:', mode);
   console.log('[Webhook] token:', token);
 
-  if (mode === 'subscribe' && token === process.env.VERIFY_TOKEN) {
+  if (
+    mode === 'subscribe' &&
+    token === process.env.VERIFY_TOKEN
+  ) {
     console.log('[Webhook] ✅ Verificado correctamente por Meta');
     return res.status(200).send(challenge);
   }
