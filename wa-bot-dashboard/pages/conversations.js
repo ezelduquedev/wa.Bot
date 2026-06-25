@@ -79,8 +79,23 @@ export default function Conversations() {
               >
                 <Avatar name={conv.contact?.name} />
                 <div className="chat-info">
-                  <div className="contact-name">
-                    {conv.contact?.name || conv.contact?.phone_number || 'Desconocido'}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div className="contact-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {conv.contact?.name || conv.contact?.phone_number || 'Desconocido'}
+                    </div>
+                    <span style={{
+                      fontSize: '9px',
+                      fontWeight: '700',
+                      textTransform: 'uppercase',
+                      color: conv.status?.toUpperCase() === 'OPEN' ? '#16a34a' : '#64748b',
+                      background: conv.status?.toUpperCase() === 'OPEN' ? '#dcfce7' : '#f1f5f9',
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      marginLeft: '8px',
+                      flexShrink: 0
+                    }}>
+                      {conv.status?.toUpperCase() === 'OPEN' ? 'Abierta' : 'Cerrada'}
+                    </span>
                   </div>
                   <div className="last-msg">{getLastMessageText(conv)}</div>
                 </div>
@@ -94,18 +109,31 @@ export default function Conversations() {
         <div className={`chat-main${!showChat ? ' hidden' : ''}`}>
           {selected ? (
             <>
-              <div className="chat-header" style={{ display: 'flex', alignItems: 'center' }}>
-                {/* Botón "volver" solo visible en móvil via CSS (.back-btn) */}
-                <button
-                  className="back-btn"
-                  onClick={() => setShowChat(false)}
-                  aria-label="Volver a la lista"
-                >
-                  ←
-                </button>
-                <strong>
-                  {selected.contact?.name || selected.contact?.phone_number || 'Desconocido'}
-                </strong>
+              <div className="chat-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  {/* Botón "volver" solo visible en móvil via CSS (.back-btn) */}
+                  <button
+                    className="back-btn"
+                    onClick={() => setShowChat(false)}
+                    aria-label="Volver a la lista"
+                  >
+                    ←
+                  </button>
+                  <strong>
+                    {selected.contact?.name || selected.contact?.phone_number || 'Desconocido'}
+                  </strong>
+                </div>
+                <span style={{
+                  fontSize: '11px',
+                  fontWeight: '700',
+                  textTransform: 'uppercase',
+                  color: selected.status?.toUpperCase() === 'OPEN' ? '#16a34a' : '#64748b',
+                  background: selected.status?.toUpperCase() === 'OPEN' ? '#dcfce7' : '#f1f5f9',
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                }}>
+                  {selected.status?.toUpperCase() === 'OPEN' ? 'Abierta' : 'Cerrada'}
+                </span>
               </div>
 
               <div className="chat-messages">

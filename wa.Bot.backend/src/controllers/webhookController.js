@@ -77,6 +77,7 @@ const receiveMessage = async (req, res) => {
     const entry    = body.entry?.[0];
     const changes  = entry?.changes?.[0]?.value;
     const messages = changes?.messages;
+    const contacts = changes?.contacts;
 
     if (!messages) {
       console.log('[Webhook] ℹ️ Evento de estado recibido (ignorado)');
@@ -84,16 +85,18 @@ const receiveMessage = async (req, res) => {
     }
 
     const message = messages[0];
+    const contactName = contacts?.[0]?.profile?.name || null;
 
     console.log('\n[Webhook] Mensaje detectado:');
     console.log(JSON.stringify(message, null, 2));
+    console.log('[Webhook] Nombre de contacto detectado:', contactName);
 
     if (message.type !== 'text') {
       console.log('[Webhook] ⚠️ Mensaje no-texto ignorado');
       return;
     }
 
-    await processIncomingMessage(message);
+    await processIncomingMessage(message, contactName);
 
   } catch (error) {
     console.error('\n[Webhook] ❌ ERROR CRÍTICO');
@@ -105,7 +108,7 @@ const receiveMessage = async (req, res) => {
 // 3. Procesamiento principal
 // ─────────────────────────────────────────────────────────────
 
-const processIncomingMessage = async (message) => {
+const processIncomingMessage = async (message, contactName) => {
   try {
     const phoneNumber = message.from;
     const text        = message.text.body;
@@ -122,7 +125,7 @@ const processIncomingMessage = async (message) => {
     // ── CONTACTO ─────────────────────────────────────────────
 
     console.log('\n[DB] Buscando/creando contacto...');
-    const contact = await findOrCreateContact(phoneNumber);
+    const contact = await findOrCreateContact(phoneNumber, contactName);
     console.log('[DB] ✅ Contacto OK:', contact.id);
 
     // ── CONVERSACIÓN ─────────────────────────────────────────

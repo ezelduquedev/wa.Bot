@@ -189,30 +189,63 @@ const generateGroqResponse = async (history, userMessage, conversationId) => {
   const apiKey = process.env.GROQ_API_KEY;
   const groq   = new Groq({ apiKey });
 
-  // 1. EXTRACCIÓN CON IA — solo del mensaje actual para complementar regex
-  const extractionPrompt = `Extrae name, email, date, time del mensaje. Responde SOLO en JSON válido. Si no existe un campo, pon null. Mensaje: "${userMessage}"`;
-  const extraction = await groq.chat.completions.create({
-    model: 'llama-3.3-70b-versatile',
-    messages: [{ role: 'user', content: extractionPrompt }],
-    response_format: { type: 'json_object' },
-    temperature: 0,
-  });
-  const aiExtracted = JSON.parse(extraction.choices[0].message.content);
-  console.log('[Groq] 🤖 IA extrajo del mensaje actual:', JSON.stringify(aiExtracted));
+  // Construimos la conversación en texto plano para que el LLM tenga todo el contexto
+  const conversationText = history.map(h => `${h.role === 'USER' ? 'Cliente' : 'Asistente'}: ${h.content}`).join('\n') + `\nCliente: ${userMessage}`;
 
-  // 2. ESTADO CONSOLIDADO (regex sobre historial completo + IA sobre mensaje actual)
+  // 1. EXTRACCIÓN CON IA — Analiza el historial completo para extraer de forma robusta
+  const extractionPrompt = `Analiza la siguiente conversación de WhatsApp entre un asistente comercial y un cliente.
+Extrae los siguientes datos si han sido proporcionados por el cliente en algún momento de la conversación:
+- name: El nombre propio del cliente (ej. "Juan", "Juan Pérez"). Si se presenta o dice su nombre, extráelo.
+- email: El correo electrónico del cliente.
+- date: La fecha propuesta para la llamada (ej. "mañana", "lunes", "25 de junio").
+- time: La hora propuesta para la llamada (ej. "17:00", "a las 5").
+- interestedService: El servicio por el que se interesa ("web", "apps", "chatbots", "business" o null).
+- appointmentAccepted: true si el cliente ha aceptado o solicitado explícitamente agendar una llamada/cita; de lo contrario false.
+
+Responde ÚNICAMENTE con un objeto JSON válido con las siguientes claves:
+{
+  "name": string o null,
+  "email": string o null,
+  "date": string o null,
+  "time": string o null,
+  "interestedService": string o null,
+  "appointmentAccepted": boolean
+}
+
+Conversación:
+${conversationText}`;
+
+  let aiExtracted = { name: null, email: null, date: null, time: null, interestedService: null, appointmentAccepted: false };
+  try {
+    const extraction = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [{ role: 'user', content: extractionPrompt }],
+      response_format: { type: 'json_object' },
+      temperature: 0,
+    });
+    aiExtracted = JSON.parse(extraction.choices[0].message.content);
+    console.log('[Groq] 🤖 IA extrajo del historial completo:', JSON.stringify(aiExtracted));
+  } catch (err) {
+    console.error('[Groq] Error en extracción con IA:', err);
+  }
+
+  // 2. ESTADO CONSOLIDADO (regex sobre historial + IA sobre historial)
   const state = detectConversationState(history, userMessage);
 
-  // IA complementa lo que regex no encontró — nunca sobreescribe
-  if (!state.name  && aiExtracted.name)  state.name  = aiExtracted.name;
-  if (!state.email && aiExtracted.email) state.email = aiExtracted.email;
-  if (!state.date  && aiExtracted.date)  state.date  = aiExtracted.date;
-  if (!state.time  && aiExtracted.time)  state.time  = aiExtracted.time;
+  // IA complementa lo que regex no encontró — nunca sobreescribe valores locales válidos si la IA los tiene
+  if (aiExtracted.name)  state.name  = aiExtracted.name;
+  if (aiExtracted.email) state.email = aiExtracted.email;
+  if (aiExtracted.date)  state.date  = aiExtracted.date;
+  if (aiExtracted.time)  state.time  = aiExtracted.time;
+  if (aiExtracted.interestedService) state.interestedService = aiExtracted.interestedService;
+  if (aiExtracted.appointmentAccepted !== undefined) {
+    state.appointmentAccepted = state.appointmentAccepted || aiExtracted.appointmentAccepted;
+  }
 
   state.isCollecting = !!(state.name || state.email || state.date || state.time || state.appointmentAccepted);
   if (state.name && state.email && state.date && state.time) state.appointmentCompleted = true;
 
-  console.log('[Groq] ✅ Estado final:', JSON.stringify(state));
+  console.log('[Groq] ✅ Estado final consolidado:', JSON.stringify(state));
 
   // 3. CITA COMPLETA → enviar email y cerrar conversación
   if (state.appointmentCompleted) {
@@ -226,17 +259,32 @@ const generateGroqResponse = async (history, userMessage, conversationId) => {
     return `¡Perfecto, ${state.name}! 🙌 Cita confirmada para el ${state.date} a las ${state.time}. Detalles enviados a ${state.email}.`;
   }
 
-  // 4. RECOGIDA DE DATOS EN CURSO
-  if (state.isCollecting) {
-    const next = getCollectionResponse(state);
-    if (next) return next;
+  // 4. RECOGIDA DE DATOS EN CURSO - CON IA DINÁMICA
+  // Si está recolectando datos, inyectamos una instrucción especial en el prompt del sistema
+  // para que la IA responda cualquier pregunta fuera del guion y pida el dato que falta.
+  let systemPromptAdicional = '';
+  if (state.isCollecting && !state.appointmentCompleted) {
+    systemPromptAdicional = `\n\n[SISTEMA - RECOPILACIÓN DE DATOS DE CITA]
+Estamos en el proceso de agendar una llamada.
+Datos recolectados hasta ahora:
+- Nombre: ${state.name ? state.name : 'FALTA'}
+- Email: ${state.email ? state.email : 'FALTA'}
+- Fecha: ${state.date ? state.date : 'FALTA'}
+- Hora: ${state.time ? state.time : 'FALTA'}
+
+INSTRUCCIONES DE RECOPILACIÓN:
+1. Revisa si el cliente ha respondido a alguna de las preguntas anteriores o si ha hecho una pregunta/comentario fuera del guion (por ejemplo: dudas de precios, ubicación, por qué piden los datos, etc.).
+2. Si el cliente hizo una pregunta o tiene una duda, RESPÓNDELA primero de forma muy breve (1-2 frases), amable y natural.
+3. Después de responder (o directamente si el cliente no preguntó nada nuevo), solicita el PRIMER dato que aparezca como 'FALTA' en la lista anterior de manera natural, cercana y conversacional.
+4. Pide solo UN dato a la vez. No acumules preguntas ni solicites varios datos en el mismo mensaje.
+5. Nunca inventes información. Habla de forma natural y directa por WhatsApp.`;
   }
 
-  // 5. RESPUESTA LIBRE DE GROQ
+  // 5. RESPUESTA DE GROQ (libre o guiada por recopilación)
   const completion = await groq.chat.completions.create({
     model: 'llama-3.3-70b-versatile',
     messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'system', content: SYSTEM_PROMPT + systemPromptAdicional },
       ...history.map(h => ({
         role:    h.role === 'USER' ? 'user' : 'assistant',
         content: h.content,

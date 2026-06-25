@@ -2,11 +2,17 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-const findOrCreateContact = async (phoneNumber) => {
+const findOrCreateContact = async (phoneNumber, name) => {
   let contact = await prisma.contact.findUnique({ where: { phoneNumber } });
   if (!contact) {
-    contact = await prisma.contact.create({ data: { phoneNumber } });
-    console.log(`[DB] Nuevo contacto creado: ${phoneNumber}`);
+    contact = await prisma.contact.create({ data: { phoneNumber, name } });
+    console.log(`[DB] Nuevo contacto creado: ${phoneNumber} (${name || 'Sin nombre'})`);
+  } else if (name && contact.name !== name) {
+    contact = await prisma.contact.update({
+      where: { phoneNumber },
+      data: { name },
+    });
+    console.log(`[DB] Nombre de contacto actualizado: ${name}`);
   }
   return contact;
 };

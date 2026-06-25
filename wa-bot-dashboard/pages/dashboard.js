@@ -23,8 +23,8 @@ export default function Dashboard() {
         const convs = Array.isArray(data) ? data : (data.conversations || []);
         setStats({
           total: convs.length,
-          open: convs.filter(c => c.status === 'open').length,
-          closed: convs.filter(c => c.status === 'closed').length,
+          open: convs.filter(c => c.status?.toUpperCase() === 'OPEN').length,
+          closed: convs.filter(c => c.status?.toUpperCase() === 'CLOSED').length,
         });
       }
     } catch (e) { console.error("Error fetching stats", e); }

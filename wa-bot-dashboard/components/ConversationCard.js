@@ -64,11 +64,11 @@ export default function ConversationCard({ conversation, onClick, isSelected }) 
         </span>
         <div style={{
           fontSize: '10px', fontWeight: '700', textTransform: 'uppercase',
-          color: conversation.status === 'open' ? '#16a34a' : '#64748b',
-          background: conversation.status === 'open' ? '#dcfce7' : '#f1f5f9',
+          color: conversation.status?.toUpperCase() === 'OPEN' ? '#16a34a' : '#64748b',
+          background: conversation.status?.toUpperCase() === 'OPEN' ? '#dcfce7' : '#f1f5f9',
           padding: '2px 8px', borderRadius: '6px',
         }}>
-          {conversation.status === 'open' ? 'Abierta' : 'Cerrada'}
+          {conversation.status?.toUpperCase() === 'OPEN' ? 'Abierta' : 'Cerrada'}
         </div>
       </div>
     </div>
